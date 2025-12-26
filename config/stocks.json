@@ -1,0 +1,19 @@
+{
+  "stocks": [
+    {
+      "ticker": "CCCC",
+      "name": "C4 Therapeutics",
+      "enabled": true
+    },
+    {
+      "ticker": "BYND",
+      "name": "Beyond Meat",
+      "enabled": true
+    }
+  ],
+  "monitoring": {
+    "check_interval_minutes": 15,
+    "notify_all_news": true,
+    "price_change_threshold_percent": 0.5
+  }
+}
