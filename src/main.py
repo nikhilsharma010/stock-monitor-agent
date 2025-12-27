@@ -258,6 +258,13 @@ def main():
     # Load .env if it exists (local dev), but don't fail if missing (cloud dev)
     load_dotenv()
     
+    # Diagnostic logging
+    for var in ['FINNHUB_API_KEY', 'TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID', 'GROQ_API_KEY']:
+        val = os.getenv(var)
+        status = "✅ FOUND" if val else "❌ MISSING"
+        masked = f"{val[:5]}...{val[-4:]}" if val and len(val) > 10 else "N/A"
+        logger.info(f"Startup Check: {var} is {status} ({masked if val else '---'})")
+    
     # Required variables
     required_vars = ['FINNHUB_API_KEY', 'TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID']
     missing_vars = [var for var in required_vars if not os.getenv(var)]

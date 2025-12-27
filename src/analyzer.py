@@ -19,10 +19,11 @@ class StockAnalyzer:
         
         if self.groq_api_key:
             self.client = Groq(api_key=self.groq_api_key)
-            self.model = "llama-3.1-70b-versatile" # High-quality available model
+            self.model = "llama-3.1-70b-versatile"
+            logger.info("StockAnalyzer: Groq client initialized successfully.")
         else:
             self.client = None
-            logger.warning("GROQ_API_KEY not found. AI commentary will be disabled.")
+            logger.warning("StockAnalyzer: GROQ_API_KEY not found during initialization.")
 
     def get_basic_financials(self, ticker):
         """Fetch basic financial metrics (P/E, Market Cap, etc.)."""
@@ -83,8 +84,18 @@ class StockAnalyzer:
 
     def get_ai_commentary(self, ticker, metrics, quote, news=None, question=None):
         """Generate AI commentary using Groq."""
+        # Dynamic re-check for key if missing (helps with live env var updates)
         if not self.client:
-            return "AI commentary is currently disabled (missing GROQ_API_KEY)."
+            self.groq_api_key = os.getenv('GROQ_API_KEY')
+            if self.groq_api_key:
+                try:
+                    self.client = Groq(api_key=self.groq_api_key)
+                    self.model = "llama-3.1-70b-versatile"
+                    logger.info("StockAnalyzer: Late-initialized Groq client.")
+                except Exception as e:
+                    logger.error(f"Failed to late-init Groq: {e}")
+            else:
+                return "AI commentary is currently disabled (missing GROQ_API_KEY in environment)."
         
         try:
             # Prepare context for AI
