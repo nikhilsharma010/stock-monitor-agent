@@ -60,13 +60,13 @@ class TelegramBotHandler:
             logger.debug(f"Error getting updates: {e}")
             return []
     
-    def send_message(self, text):
+    def send_message(self, message, chat_id=None):
         """Send a message to the user."""
         try:
             url = f"{self.api_url}/sendMessage"
             payload = {
                 'chat_id': chat_id or self.chat_id,
-                'text': text,
+                'text': message,
                 'parse_mode': 'HTML'
             }
             response = requests.post(url, json=payload, timeout=10)
