@@ -58,6 +58,21 @@ class StockAnalyzer:
             logger.error(f"Error fetching financials for {ticker}: {e}")
             return None
 
+    def get_company_profile(self, ticker):
+        """Fetch company profile (Industry, Sector, Description)."""
+        try:
+            url = f"{self.finnhub_base_url}/stock/profile2"
+            params = {
+                'symbol': ticker,
+                'token': self.finnhub_api_key
+            }
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error(f"Error fetching profile for {ticker}: {e}")
+            return {}
+
     def get_stock_quote(self, ticker):
         """Fetch current stock price and daily change."""
         try:
@@ -86,9 +101,9 @@ class StockAnalyzer:
             logger.error(f"Error fetching quote for {ticker}: {e}")
             return None
 
-    def get_ai_commentary(self, ticker, metrics, quote, news=None, question=None):
-        """Generate AI commentary using Groq."""
-        # Dynamic re-check for key if missing (helps with live env var updates)
+    def get_ai_commentary(self, ticker, metrics, quote, news=None, question=None, profile=None):
+        """Generate Deep AI commentary using Groq."""
+        # Dynamic re-check for key if missing
         if not self.client:
             self.groq_api_key = os.getenv('GROQ_API_KEY') or os.getenv('GROQ_KEY')
             if self.groq_api_key:
@@ -99,49 +114,37 @@ class StockAnalyzer:
                 except Exception as e:
                     logger.error(f"Failed to late-init Groq: {e}")
             else:
-                return "AI commentary is currently disabled (missing GROQ_API_KEY in environment)."
+                return "AI commentary is currently disabled (missing GROQ_API_KEY)."
         
         try:
-            # Prepare context for AI
-            if quote:
-                price_context = (
-                    f"Current Price: ${quote['current_price']}\n"
-                    f"Today's Change: ${quote['change']} ({quote['percent_change']}%)\n"
-                    f"Day's Range: ${quote['low']} - ${quote['high']}\n"
-                    f"Previous Close: ${quote['previous_close']}"
-                )
-            else:
-                price_context = "Current price action data not available."
-
+            # Context Preparation
+            price_context = f"Price: ${quote['current_price']} ({quote['percent_change']}%)" if quote else "Price N/A"
+            industry = profile.get('finnhubIndustry', 'Unknown Industry') if profile else "Unknown Industry"
+            
             metrics_str = (
-                f"P/E Ratio: {metrics['pe_ratio']}\n"
-                f"Market Cap: {metrics['market_cap']}M\n"
-                f"52-Week High: {metrics['52_week_high']}\n"
-                f"52-Week Low: {metrics['52_week_low']}\n"
-                f"Beta: {metrics['beta']}"
+                f"P/E: {metrics['pe_ratio']}, Market Cap: {metrics['market_cap']}M, "
+                f"52W Range: {metrics['52_week_low']} - {metrics['52_week_high']}"
             )
             
-            news_str = ""
+            news_context = ""
             if news:
-                news_str = "\nRecent News:\n" + "\n".join([f"- {n['headline']}" for n in news[:3]])
+                # Take up to 8 representative headlines for the last 60 days
+                headlines = [n['headline'] for n in news[:10]]
+                news_context = "\nRecent 60-Day News Headlines:\n" + "\n".join([f"- {h}" for h in headlines])
 
-            # Prompt Construction
             if question:
-                system_prompt = "You are a seasoned financial analyst. Provide precise, factual answers about stocks."
-                user_prompt = (
-                    f"Answer the following question about {ticker}.\n\n"
-                    f"Context Data:\n{metrics_str}\n\nRecent Price Action:\n{price_context}\n{news_str}\n\n"
-                    f"Question: {question}\n"
-                )
+                system_prompt = f"You are a Senior Equity Analyst. Industry: {industry}."
+                user_prompt = f"Stock: {ticker}\nMetrics: {metrics_str}\n{price_context}\n{news_context}\n\nQuestion: {question}"
             else:
-                system_prompt = "You are a seasoned financial analyst. Be professional, concise, and focused on data."
+                system_prompt = f"You are a Senior Strategic Advisor. Focus: Narrative Tracking & Industry Trends in {industry}."
                 user_prompt = (
-                    f"Provide a fundamental analysis for {ticker}.\n\n"
-                    f"Financial Metrics:\n{metrics_str}\n\nRecent Price Action:\n{price_context}\n{news_str}\n"
-                    "\nTask:\n"
-                    "1. Summarize the company's current financial health.\n"
-                    "2. Analyze recent price trends based on the day's movement and 52W range.\n"
-                    "3. Give a clear 'Buy/Hold/Sell' recommendation with a 1-sentence justification.\n"
+                    f"Perform a 'Deep Intelligence' report for {ticker} over the last 60 days.\n\n"
+                    f"Data: {metrics_str}\n{price_context}\n{news_context}\n\n"
+                    "Task:\n"
+                    "1. 📈 Narrative Tracking: Identify the main theme/story from the last 60 days of news.\n"
+                    f"2. 🏢 Industry Context: How is this company positioned within {industry} right now?\n"
+                    "3. 🎯 Deep Insight: What is the most critical factor for investors to watch in the next 30 days?\n"
+                    "4. Rating: Buy/Hold/Sell with 1-sentence logic."
                 )
 
             chat_completion = self.client.chat.completions.create(
@@ -150,15 +153,15 @@ class StockAnalyzer:
                     {"role": "user", "content": user_prompt}
                 ],
                 model=self.model,
-                temperature=0.2,
-                max_tokens=600
+                temperature=0.3, # Slightly higher for more "insightful" connections
+                max_tokens=1000
             )
             
             return chat_completion.choices[0].message.content
             
         except Exception as e:
-            logger.error(f"Error generating AI commentary for {ticker}: {str(e)}")
-            return f"⚠️ Failed to generate AI commentary with Groq: {str(e)}"
+            logger.error(f"Error generating AI deep commentary for {ticker}: {str(e)}")
+            return f"⚠️ AI deep analysis failed: {str(e)}"
 
     def get_ai_comparison(self, t1, m1, q1, t2, m2, q2):
         """Generate a side-by-side AI comparison of two stocks."""

@@ -175,35 +175,47 @@ Use /list to see your personal stocks.
 """
 
     def handle_analyse(self, ticker):
-        """Perform fundamental analysis on a stock."""
+        """Perform 60-day 'Deep Intelligence' analysis on a stock."""
         ticker = ticker.upper().strip()
-        self.send_message(f"🔍 <b>Analyzing {ticker}...</b>\nFetching financials and AI commentary. This may take a moment.")
+        self.send_message(f"🔍 <b>Generating Deep Intelligence Report for {ticker}...</b>\nFetching 60 days of context and sector trends. Please wait.")
         
         try:
+            # 1. Fetch Metrics
             metrics = self.analyzer.get_basic_financials(ticker)
             if not metrics:
-                return f"❌ Failed to fetch financial metrics for {ticker}. The symbol might be incorrect or API limit reached."
+                return f"❌ Failed to fetch financial metrics for {ticker}."
             
+            # 2. Fetch Quote
             quote = self.analyzer.get_stock_quote(ticker)
             
-            # Get AI commentary
-            commentary = self.analyzer.get_ai_commentary(ticker, metrics, quote)
+            # 3. Fetch Company Profile (New for Deep Intelligence)
+            profile = self.analyzer.get_company_profile(ticker)
             
-            # Format metrics summary
-            summary = (
-                f"📊 <b>Fundamental Data: {ticker}</b>\n\n"
-                f"💰 P/E Ratio: {metrics['pe_ratio'] or 'N/A'}\n"
-                f"🏦 Market Cap: {metrics['market_cap'] or 'N/A'}M\n"
-                f"📏 P/S Ratio: {metrics['ps_ratio'] or 'N/A'}\n"
-                f"📈 52W High: ${metrics['52_week_high'] or 'N/A'}\n"
-                f"📉 52W Low: ${metrics['52_week_low'] or 'N/A'}\n"
-                f"🎲 Beta: {metrics['beta'] or 'N/A'}\n\n"
-                f"<b>🧠 AI Analysis:</b>\n{commentary}"
+            # 4. Fetch 60 Days of News (Phase 3 Requirement)
+            from news_monitor import NewsMonitor
+            news_mon = NewsMonitor()
+            news = news_mon.get_company_news(ticker, days_back=60)
+            
+            # 5. Get AI Deep Commentary
+            commentary = self.analyzer.get_ai_commentary(ticker, metrics, quote, news=news, profile=profile)
+            
+            # Format report
+            industry = profile.get('finnhubIndustry', 'N/A')
+            sector = profile.get('finnhubSector', 'N/A')
+            
+            report = (
+                f"🧠 <b>60-Day Intelligence: {ticker}</b>\n"
+                f"<i>{profile.get('name', ticker)} | Sector: {sector}</i>\n\n"
+                f"💰 <b>Metrics:</b>\n"
+                f"• P/E: {metrics['pe_ratio']} | Cap: {metrics['market_cap']}M\n"
+                f"• Range: ${metrics['52_week_low']} - ${metrics['52_week_high']}\n\n"
+                f"<b>Deep Analysis:</b>\n{commentary}"
             )
-            return summary
+            return report
+            
         except Exception as e:
             logger.error(f"Crash in handle_analyse: {e}", exc_info=True)
-            return f"❌ An internal error occurred during analysis: {str(e)}"
+            return f"❌ Analysis failed: {str(e)}"
 
     def handle_ask(self, parts_text):
         """Handle user questions about a stock."""
@@ -216,15 +228,18 @@ Use /list to see your personal stocks.
         
         self.send_message(f"🤔 <b>Consulting AI about {ticker}...</b>")
         
-        metrics = self.analyzer.get_basic_financials(ticker)
-        quote = self.analyzer.get_stock_quote(ticker)
-        
         # We try to get news too if possible for better context
         # But we don't have direct access to NewsMonitor here easily without passing it
-        # Let's stick to metrics and history for now, or fetch news inside analyzer
-        
-        answer = self.analyzer.get_ai_commentary(ticker, metrics, quote, question=question)
-        return f"🤖 <b>AI Answer for {ticker}:</b>\n\n{answer}"
+        try:
+            metrics = self.analyzer.get_basic_financials(ticker)
+            quote = self.analyzer.get_stock_quote(ticker)
+            profile = self.analyzer.get_company_profile(ticker)
+            
+            answer = self.analyzer.get_ai_commentary(ticker, metrics, quote, question=question, profile=profile)
+            return f"🤖 <b>AI Answer for {ticker}:</b>\n\n{answer}"
+        except Exception as e:
+            logger.error(f"Error in handle_ask: {e}", exc_info=True)
+            return f"❌ Failed to get AI answer: {str(e)}"
     
     def handle_compare(self, args):
         """Compare two stock tickers."""
