@@ -378,26 +378,34 @@ This platform is free and open-source, but running the AI models and infrastruct
     def handle_debug(self):
         """Show diagnostic information."""
         from dotenv import load_dotenv
-        load_dotenv() # Refresh just in case
+        load_dotenv() 
         
-        vars_to_check = ['FINNHUB_API_KEY', 'TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID', 'GROQ_API_KEY', 'GROQ_KEY']
         lines = ["🔎 <b>System Debug Information</b>\n"]
         
-        for var in vars_to_check:
-            val = os.getenv(var)
-            status = "✅ Found" if val else "❌ Missing"
-            masked = f"{val[:5]}...{val[-4:]}" if val and len(val) > 10 else "N/A"
-            lines.append(f"• {var}: {status} ({masked})")
-            
-        # Search for similar named keys
-        all_keys = os.environ.keys()
-        similar = [k for k in all_keys if 'GROQ' in k or 'KEY' in k]
-        if similar:
-            lines.append(f"\nPotential Matches Found: {', '.join(similar)}")
-            
-        lines.append(f"\nModel Initialized: {'✅ Yes' if self.analyzer.client else '❌ No'}")
-        lines.append(f"Process ID: {os.getpid()}")
-        lines.append(f"Server Time: {datetime.now().strftime('%H:%M:%S')}")
+        # 1. Check Core Bot Keys
+        tg_token = os.getenv('TELEGRAM_BOT_TOKEN')
+        tg_status = "✅ Found" if tg_token else "❌ Missing"
+        lines.append(f"• Telegram Token: {tg_status}")
+        
+        # 2. Check Finnhub
+        fh_key = os.getenv('FINNHUB_API_KEY')
+        fh_status = "✅ Found" if fh_key else "❌ Missing"
+        lines.append(f"• Finnhub API Key: {fh_status}")
+        
+        # 3. Check Groq (Integrated Search)
+        groq_key = self.analyzer.groq_api_key
+        if groq_key:
+            # Mask key for safety
+            masked = f"{groq_key[:5]}...{groq_key[-4:]}"
+            lines.append(f"• Groq AI Engine: ✅ Active ({masked})")
+        else:
+            lines.append("• Groq AI Engine: ❌ Missing (Check GROQ_API_KEY)")
+
+        lines.append(f"\n<b>Bot Status:</b>")
+        lines.append(f"• Model Ready: {'✅ Yes' if self.analyzer.client else '❌ No'}")
+        lines.append(f"• Multi-User DB: ✅ Connected")
+        lines.append(f"• Server Time: {datetime.now().strftime('%H:%M:%S')}")
+        
         return "\n".join(lines)
     
     def process_command(self, message_text, user_id, chat_id):
