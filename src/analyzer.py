@@ -92,7 +92,10 @@ class StockAnalyzer:
         
         try:
             # Prepare context for AI
-            history_str = "\n".join([f"{h['date']}: ${h['close']}" for h in history[-5:]]) # Last 5 days for brevity
+            if history:
+                history_str = "\n".join([f"{h['date']}: ${h['close']}" for h in history[-5:]])
+            else:
+                history_str = "Price history not available for this period."
             metrics_str = (
                 f"P/E Ratio: {metrics['pe_ratio']}\n"
                 f"Market Cap: {metrics['market_cap']}M\n"

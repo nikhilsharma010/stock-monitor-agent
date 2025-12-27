@@ -220,10 +220,8 @@ Use /list to see all stocks
             if not metrics:
                 return f"❌ Failed to fetch financial metrics for {ticker}. The symbol might be incorrect or API limit reached."
             
-            history = self.analyzer.get_price_history(ticker)
-            if not history:
-                return f"❌ Failed to fetch price history for {ticker}. (Financial metrics were retrieved: P/E {metrics['pe_ratio']})"
-
+            history = self.analyzer.get_price_history(ticker) or []
+            
             # Get AI commentary
             commentary = self.analyzer.get_ai_commentary(ticker, metrics, history)
             
