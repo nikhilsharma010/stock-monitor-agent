@@ -19,7 +19,7 @@ class StockAnalyzer:
         
         if self.gemini_api_key:
             genai.configure(api_key=self.gemini_api_key)
-            self.model = genai.GenerativeModel('gemini-1.5-flash')
+            self.model = genai.GenerativeModel('gemini-2.0-flash')
         else:
             self.model = None
             logger.warning("GEMINI_API_KEY not found. AI commentary will be disabled.")
