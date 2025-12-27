@@ -238,8 +238,22 @@ This platform is free and open-source, but running the AI models and infrastruct
 ☕️ Support the Platform: /donate
 """
 
-    def handle_analyse(self, ticker, chat_id):
+    def handle_start(self, user_id, chat_id):
+        """Handle /start with onboarding."""
+        self.cache.set_user_step(user_id, 1)
+        msg = (
+            "🚀 <b>Welcome to the Alpha Intelligence Concierge!</b>\n\n"
+            "Before we dive into the markets, let's map your <b>Financial DNA</b>.\n\n"
+            "First, what is your <b>Risk Appetite?</b>"
+        )
+        # Use handle_risk to get the keyboard
+        _, kb = self.handle_risk(chat_id)
+        return msg, kb
+
+    def handle_analyse(self, ticker, chat_id, user_id=None):
         """Perform 60-day 'Deep Intelligence' analysis on a stock."""
+        # Use chat_id as fallback for user_id
+        u_id = user_id or chat_id
         ticker = ticker.upper().strip()
         self.send_message(f"🔍 <b>Generating Deep Intelligence Report for {ticker}...</b>\nFetching 60 days of context and sector trends. Please wait.", chat_id=chat_id)
         
@@ -262,7 +276,7 @@ This platform is free and open-source, but running the AI models and infrastruct
             performance = self.analyzer.get_performance_metrics(ticker)
             
             # 6. Fetch user risk profile (Phase 10)
-            risk = self.cache.get_user_risk(user_id)
+            risk = self.cache.get_user_risk(u_id)
             
             # 7. Fetch Alpha Intel
             alpha_intel = self.analyzer.get_alpha_intelligence(ticker)
@@ -354,8 +368,9 @@ This platform is free and open-source, but running the AI models and infrastruct
             logger.error(f"Error in handle_analyse: {e}", exc_info=True)
             return f"❌ Failed to generate report: {str(e)}", None
 
-    def handle_ask(self, parts_text, chat_id):
+    def handle_ask(self, parts_text, chat_id, user_id=None):
         """Handle user questions about a stock."""
+        u_id = user_id or chat_id
         parts = parts_text.split(maxsplit=1)
         if len(parts) < 2:
             return "❌ Usage: /ask TICKER QUESTION\nExample: /ask CCCC Who are their competitors?"
@@ -372,7 +387,7 @@ This platform is free and open-source, but running the AI models and infrastruct
             quote = self.analyzer.get_stock_quote(ticker)
             profile = self.analyzer.get_company_profile(ticker)
             
-            risk = self.cache.get_user_risk(chat_id) # assuming chat_id matches user_id for DM
+            risk = self.cache.get_user_risk(u_id)
             alpha = self.analyzer.get_alpha_intelligence(ticker)
             
             answer = self.analyzer.get_ai_commentary(ticker, metrics, quote, question=question, profile=profile, alpha_intel=alpha, risk_profile=risk)
@@ -382,8 +397,9 @@ This platform is free and open-source, but running the AI models and infrastruct
             return f"❌ Failed to get AI answer: {str(e)}"
     
     
-    def handle_chart(self, args, chat_id):
+    def handle_chart(self, args, chat_id, user_id=None):
         """Generate and send technical chart."""
+        u_id = user_id or chat_id
         if not args:
             return "❌ Usage: /chart TICKER\nExample: /chart NVDA"
         
@@ -421,8 +437,9 @@ This platform is free and open-source, but running the AI models and infrastruct
             logger.error(f"Error in handle_chart for {ticker}: {e}", exc_info=True)
             return f"❌ Error: {str(e)}"
 
-    def handle_compare(self, args, chat_id):
+    def handle_compare(self, args, chat_id, user_id=None):
         """Compare two stock tickers."""
+        u_id = user_id or chat_id
         tickers = args.upper().strip().split()
         if len(tickers) < 2:
             return "❌ Usage: /compare TICKER1 TICKER2\nExample: /compare AAPL MSFT"
@@ -505,7 +522,7 @@ This platform is free and open-source, but running the AI models and infrastruct
             args = parts[1] if len(parts) > 1 else ''
             
             if command == '/start':
-                return self.handle_help(), None
+                return self.handle_start(user_id, chat_id)
             elif command == '/help':
                 return self.handle_help(), None
             elif command == '/add':
@@ -528,15 +545,15 @@ This platform is free and open-source, but running the AI models and infrastruct
                 if not args:
                     cmd_name = command[1:]
                     return f"❌ Usage: /{cmd_name} TICKER\nExample: /{cmd_name} AAPL", None
-                return self.handle_analyse(args, chat_id)
+                return self.handle_analyse(args, chat_id, user_id)
             elif command == '/chart':
-                return self.handle_chart(args, chat_id), None
+                return self.handle_chart(args, chat_id, user_id), None
             elif command == '/ask':
                 if not args:
                     return "❌ Usage: /ask TICKER QUESTION\nExample: /ask CCCC What does this company do?", None
-                return self.handle_ask(args, chat_id), None
+                return self.handle_ask(args, chat_id, user_id), None
             elif command == '/compare':
-                return self.handle_compare(args, chat_id), None
+                return self.handle_compare(args, chat_id, user_id), None
             elif command == '/debug':
                 return self.handle_debug(), None
             elif command == '/ping':
@@ -544,9 +561,9 @@ This platform is free and open-source, but running the AI models and infrastruct
             elif command == '/undervalued' or command == '/alpha' or command == '/discovery':
                 return self.handle_undervalued(chat_id), None
             elif command == '/risk':
-                return self.handle_risk(chat_id)
+                return self.handle_risk(chat_id, user_id)
             elif command == '/premarket':
-                return self.handle_premarket(chat_id), None
+                return self.handle_premarket(chat_id, user_id), None
             elif command == '/sectors':
                 return self.handle_sectors(), None
             elif command == '/donate':
@@ -575,7 +592,7 @@ This platform is free and open-source, but running the AI models and infrastruct
             self.handle_chart(ticker, chat_id)
         elif action == 'snap':
             # handle_analyse returns tuple (msg, kb_json), we need to send it
-            msg, kb = self.handle_analyse(ticker, chat_id)
+            msg, kb = self.handle_analyse(ticker, chat_id, user_id)
             self.telegram_notifier.send_message(msg, chat_id=chat_id, reply_markup=kb)
         elif action == 'industry':
             report = self.analyzer.get_industry_analysis(ticker)
@@ -583,12 +600,45 @@ This platform is free and open-source, but running the AI models and infrastruct
         elif action == 'setrisk':
             # ticker here is the risk profile name
             success = self.cache.set_user_risk(chat_id, ticker)
-            if success:
+            
+            # Phase 11 Onboarding Logic
+            state = self.cache.get_user_state(user_id)
+            if state['step'] == 1:
+                self.cache.set_user_step(user_id, 2)
+                self.telegram_notifier.send_message(
+                    f"✅ <b>Risk Strategy Locked: {ticker}</b>\n\n"
+                    "Next, tell me which <b>Sectors or Themes</b> interest you? (e.g. AI, Clean Energy, SaaS, Chipmakers)\n\n"
+                    "<i>Just type your interests below:</i>", 
+                    chat_id=chat_id
+                )
+            elif success:
                 self.telegram_notifier.send_message(f"✅ <b>Risk Profile set to: {ticker}</b>\nFuture reports will be tailored to this strategy.", chat_id=chat_id)
             else:
                 self.telegram_notifier.send_message("❌ Failed to update risk profile.", chat_id=chat_id)
         elif action == 'prompt_compare':
             self.telegram_notifier.send_message(f"🔍 <b>To compare {ticker}</b>, type: <code>/compare {ticker} TICKER2</code>", chat_id=chat_id)
+
+    def handle_onboarding_interests(self, user_id, chat_id, text):
+        """Finalize onboarding with interests."""
+        self.cache.set_user_interests(user_id, text)
+        self.cache.set_user_step(user_id, 0)
+        
+        self.send_message("🤵‍♂️ <b>Mapping your Financial DNA...</b>", chat_id=chat_id)
+        
+        state = self.cache.get_user_state(user_id)
+        summary = self.analyzer.get_persona_summary(state['risk'], state['interests'])
+        
+        report = (
+            f"🤝 <b>WELCOME TO ALPHA INTELLIGENCE</b>\n\n"
+            f"{summary}\n\n"
+            "────────────────────────\n"
+            "🚀 <b>QUICK START GUIDE:</b>\n"
+            "• Use <code>/snapshot TICKER</code> for deep analysis.\n"
+            "• Use <code>/premarket</code> for your morning brief.\n"
+            "• Use <code>/undervalued</code> to find new plays.\n"
+            "• 🎙 <b>Tip:</b> Try sending a voice note!"
+        )
+        self.telegram_notifier.send_message(report, chat_id=chat_id)
 
     def handle_undervalued(self, chat_id):
         """Find and display undervalued stock picks."""
@@ -600,9 +650,10 @@ This platform is free and open-source, but running the AI models and infrastruct
             logger.error(f"Error in handle_undervalued: {e}")
             return "❌ Alpha Discovery failed. Please try again."
 
-    def handle_risk(self, chat_id):
+    def handle_risk(self, chat_id, user_id=None):
         """Allow user to select their risk profile."""
-        current = self.cache.get_user_risk(chat_id)
+        u_id = user_id or chat_id
+        current = self.cache.get_user_risk(u_id)
         msg = f"🛡️ <b>RISK PROFILING</b>\nYour current profile is: <b>{current}</b>\n\nSelect a strategy to tailor AI reports:"
         keyboard = {"inline_keyboard": [
             [
@@ -615,10 +666,11 @@ This platform is free and open-source, but running the AI models and infrastruct
         ]}
         return msg, json.dumps(keyboard)
 
-    def handle_premarket(self, chat_id):
+    def handle_premarket(self, chat_id, user_id=None):
         """Generate pre-market briefing."""
-        risk = self.cache.get_user_risk(chat_id)
-        wl = self.cache.get_user_watchlist(chat_id)
+        u_id = user_id or chat_id
+        risk = self.cache.get_user_risk(u_id)
+        wl = self.cache.get_user_watchlist(u_id)
         self.send_message("☕️ <b>Brewing your Pre-Market Alpha Briefing...</b>\nAnalyzing global sector rotation and your watchlist. Please wait.", chat_id=chat_id)
         report = self.analyzer.get_pre_market_briefing(risk_profile=risk, watchlist=wl)
         return f"📍 <b>PRE-MARKET ALPHA: The Institutional Brief</b>\n\n{report}{self.FINANCIAL_DISCLAIMER}"
@@ -732,6 +784,12 @@ This platform is free and open-source, but running the AI models and infrastruct
                     continue # Ignore normal chatter in groups
             
             if not text.startswith('/'):
+                # Phase 11: Check if in onboarding
+                state = self.cache.get_user_state(user_id)
+                if state['step'] == 2:
+                    self.handle_onboarding_interests(user_id, chat_id, text)
+                    continue
+
                 # Process as natural language if it doesn't start with / but in DM
                 if message['chat']['type'] == 'private':
                     # Find a ticker and route to /ask

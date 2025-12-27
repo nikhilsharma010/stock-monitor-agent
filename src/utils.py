@@ -50,6 +50,8 @@ class CacheDB:
                 username TEXT,
                 first_name TEXT,
                 risk_profile TEXT DEFAULT 'Moderate',
+                onboarding_step INTEGER DEFAULT 0,
+                interests TEXT,
                 last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 command_count INTEGER DEFAULT 0
             )
@@ -213,6 +215,47 @@ class CacheDB:
         except Exception as e:
             logger.error(f"Error getting risk for {user_id}: {e}")
             return 'Moderate'
+
+    def set_user_step(self, user_id, step):
+        """Update user onboarding step."""
+        try:
+            conn = sqlite3.connect(self.db_path, timeout=30)
+            cursor = conn.cursor()
+            cursor.execute('UPDATE users SET onboarding_step = ? WHERE user_id = ?', (step, str(user_id)))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            logger.error(f"Error setting step for {user_id}: {e}")
+            return False
+
+    def set_user_interests(self, user_id, interests):
+        """Update user interests."""
+        try:
+            conn = sqlite3.connect(self.db_path, timeout=30)
+            cursor = conn.cursor()
+            cursor.execute('UPDATE users SET interests = ? WHERE user_id = ?', (interests, str(user_id)))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            logger.error(f"Error setting interests for {user_id}: {e}")
+            return False
+
+    def get_user_state(self, user_id):
+        """Fetch step, interests, and risk for onboarding state machine."""
+        try:
+            conn = sqlite3.connect(self.db_path, timeout=30)
+            cursor = conn.cursor()
+            cursor.execute('SELECT onboarding_step, interests, risk_profile FROM users WHERE user_id = ?', (str(user_id),))
+            row = cursor.fetchone()
+            conn.close()
+            if row:
+                return {'step': row[0], 'interests': row[1] or '', 'risk': row[2]}
+            return {'step': 0, 'interests': '', 'risk': 'Moderate'}
+        except Exception as e:
+            logger.error(f"Error getting user state for {user_id}: {e}")
+            return {'step': 0, 'interests': '', 'risk': 'Moderate'}
 
     # --- WATCHLIST METHODS ---
 

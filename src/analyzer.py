@@ -743,3 +743,28 @@ FORMAT:
         except Exception as e:
             logger.error(f"Error in pre-market briefing: {e}")
             return "❌ Pre-Market briefing generation failed."
+
+    def get_persona_summary(self, risk_profile, interests):
+        """Generate a personalized AI greeting for onboarding."""
+        if not self.client: return "AI Advisor is offline."
+        try:
+            system_prompt = (
+                "You are an Institutional Concierge for an elite stock analysis bot.\n"
+                "TASK: Generate a concise, welcoming personality summary for a new user.\n"
+                "RULES: 1. Address their Risk Profile and Interests specifically.\n"
+                "2. Tell them exactly how best to use this bot (e.g. commands they should use).\n"
+                "3. Keep it under 150 words. Be professional but high-energy."
+            )
+            
+            user_prompt = f"User Profile: {risk_profile} Investor interested in {interests}."
+            
+            completion = self.client.chat.completions.create(
+                messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
+                model=self.model,
+                temperature=0.4,
+                max_tokens=300
+            )
+            return completion.choices[0].message.content
+        except Exception as e:
+            logger.error(f"Error in persona summary: {e}")
+            return "✅ Onboarding Complete! Start by typing /help to see all commands."
