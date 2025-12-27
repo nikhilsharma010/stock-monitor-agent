@@ -35,6 +35,8 @@ class StockAnalyzer:
                 return v
         return None
 
+    CORE_ALPHA_LIST = ['NVDA', 'TSLA', 'AAPL', 'MSFT', 'AMZN', 'GOOGL', 'META', 'NFLX', 'AMD', 'AVGO', 'ASML', 'PLTR', 'SNOW', 'MDB', 'CRWD', 'ZS', 'PANW', 'NET', 'DDOG', 'OKTA']
+
     def __init__(self, finnhub_api_key=None, groq_api_key=None):
         self.finnhub_api_key = finnhub_api_key or os.getenv('FINNHUB_API_KEY')
         self.groq_api_key = groq_api_key or self._find_groq_key()
@@ -573,3 +575,100 @@ FORMAT:
         except Exception as e:
             logger.error(f"Error fetching alpha intel for {ticker}: {e}")
             return intel
+
+    def get_industry_peers(self, ticker):
+        """Use AI to identify 3-4 top direct competitors."""
+        if not self.client: return []
+        try:
+            profile = self.get_company_profile(ticker)
+            ind = profile.get('finnhubIndustry', 'N/A')
+            
+            system_prompt = "You are a Bloomberg Terminal data provider. Respond ONLY with a comma-separated list of 3-4 stock tickers that are the closest direct competitors/peers to the given ticker."
+            user_prompt = f"Ticker: {ticker}\nIndustry: {ind}"
+            
+            completion = self.client.chat.completions.create(
+                messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
+                model=self.model,
+                temperature=0.1,
+                max_tokens=50
+            )
+            peers_str = completion.choices[0].message.content.strip()
+            # Clean up: remove dots, spaces, uppercase
+            peers = [p.strip().upper().replace('.','') for p in peers_str.split(',')]
+            return [p for p in peers if p != ticker][:4]
+        except Exception as e:
+            logger.error(f"Error getting peers for {ticker}: {e}")
+            return []
+
+    def get_industry_analysis(self, ticker):
+        """Build a comparison table vs peers."""
+        try:
+            peers = self.get_industry_peers(ticker)
+            if not peers: return "⚠️ Industry peer data unavailable."
+            
+            # Fetch data for main ticker
+            m_main = self.get_basic_financials(ticker)
+            q_main = self.get_stock_quote(ticker)
+            
+            lines = [f"🏭 <b>INDUSTRY BENCHMARK: {ticker} vs Peers</b>\n"]
+            lines.append("<code>")
+            lines.append(f"{'TICKER':<8} {'P/E':<8} {'MARGIN':<8} {'REV_G':<8}")
+            
+            def add_row(t, m):
+                pe = str(m.get('pe_ratio', 'N/A'))[:6]
+                margin = str(m.get('net_margin', 'N/A'))[:6]
+                growth = str(m.get('revenue_growth', 'N/A'))[:6]
+                lines.append(f"{t:<8} {pe:<8} {margin:<8}% {growth:<8}%")
+
+            add_row(f"*{ticker}", m_main)
+            
+            for p in peers:
+                m_peer = self.get_basic_financials(p)
+                add_row(p, m_peer)
+            
+            lines.append("</code>")
+            
+            # Add AI Context
+            context = f"Comparing {ticker} vs rivals {', '.join(peers)}. Focus on relative valuation and efficiency."
+            ai_verdict = self.get_ai_commentary(ticker, m_main, q_main, question=context)
+            
+            return "\n".join(lines) + f"\n\n<b>⚖️ RELATIVE VERDICT</b>\n{ai_verdict}"
+        except Exception as e:
+            logger.error(f"Error in industry analysis for {ticker}: {e}")
+            return f"❌ Industry analysis failed: {str(e)}"
+
+    def get_undervalued_picks(self):
+        """Analyze Alpha List for undervalued opportunities."""
+        if not self.client: return "AI Discovery is offline."
+        try:
+            # Picking 5 from Alpha List at random to analyze
+            import random
+            sample = random.sample(self.CORE_ALPHA_LIST, 5)
+            
+            candidates = []
+            for t in sample:
+                m = self.get_basic_financials(t)
+                q = self.get_stock_quote(t)
+                # Simple logic: Growth > 15% and P/E < 35 (very basic, AI will refine)
+                candidates.append({'ticker': t, 'metrics': m, 'quote': q})
+
+            system_prompt = (
+                "You are an Institutional Value & Growth Strategist.\n"
+                "TASK: Identify the TOP 2 'Best Buys' from the provided list based on 'Undervaluation' and 'Upside Potential'.\n"
+                "FORMAT: Bullet points. Header [TICKER] - Reasoning."
+            )
+            
+            data_summary = ""
+            for c in candidates:
+                data_summary += f"{c['ticker']}: P/E {c['metrics']['pe_ratio']}, Growth {c['metrics']['revenue_growth']}%, Price ${c['quote']['current_price']}\n"
+            
+            completion = self.client.chat.completions.create(
+                messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": data_summary}],
+                model=self.model,
+                temperature=0.2,
+                max_tokens=400
+            )
+            return completion.choices[0].message.content
+        except Exception as e:
+            logger.error(f"Error in undervalued picks: {e}")
+            return "❌ Alpha Discovery failed."

@@ -338,6 +338,9 @@ This platform is free and open-source, but running the AI models and infrastruct
                 [
                     {"text": "📈 View Technical Chart", "callback_data": f"chart:{ticker}"},
                     {"text": "⚖️ Compare Ticker", "callback_data": f"prompt_compare:{ticker}"}
+                ],
+                [
+                    {"text": "🏭 Industry Review", "callback_data": f"industry:{ticker}"}
                 ]
             ]}
 
@@ -532,6 +535,8 @@ This platform is free and open-source, but running the AI models and infrastruct
                 return self.handle_debug(), None
             elif command == '/ping':
                 return "🏓 <b>Pong!</b> Bot is online and responsive.", None
+            elif command == '/undervalued' or command == '/alpha' or command == '/discovery':
+                return self.handle_undervalued(chat_id), None
             elif command == '/donate':
                 return self.handle_donate(), None
             else:
@@ -560,8 +565,21 @@ This platform is free and open-source, but running the AI models and infrastruct
             # handle_analyse returns tuple (msg, kb_json), we need to send it
             msg, kb = self.handle_analyse(ticker, chat_id)
             self.telegram_notifier.send_message(msg, chat_id=chat_id, reply_markup=kb)
+        elif action == 'industry':
+            report = self.analyzer.get_industry_analysis(ticker)
+            self.telegram_notifier.send_message(report + self.FINANCIAL_DISCLAIMER, chat_id=chat_id)
         elif action == 'prompt_compare':
             self.telegram_notifier.send_message(f"🔍 <b>To compare {ticker}</b>, type: <code>/compare {ticker} TICKER2</code>", chat_id=chat_id)
+
+    def handle_undervalued(self, chat_id):
+        """Find and display undervalued stock picks."""
+        self.send_message("🔍 <b>Searching Alpha List for undervalued gems...</b>\nAnalyzing growth vs valuation metrics. Please wait.", chat_id=chat_id)
+        try:
+            report = self.analyzer.get_undervalued_picks()
+            return f"💎 <b>ALPHA DISCOVERY: Top Undervalued Picks</b>\n\n{report}{self.FINANCIAL_DISCLAIMER}"
+        except Exception as e:
+            logger.error(f"Error in handle_undervalued: {e}")
+            return "❌ Alpha Discovery failed. Please try again."
 
     def check_and_handle_commands(self):
         """Check for new commands and callback queries."""
