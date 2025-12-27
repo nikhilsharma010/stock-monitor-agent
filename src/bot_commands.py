@@ -45,9 +45,9 @@ class TelegramBotHandler:
             url = f"{self.api_url}/getUpdates"
             params = {
                 'offset': self.last_update_id + 1,
-                'timeout': 1
+                'timeout': 30  # Long polling timeout
             }
-            response = requests.get(url, params=params, timeout=5)
+            response = requests.get(url, params=params, timeout=35)
             response.raise_for_status()
             
             data = response.json()
@@ -323,3 +323,13 @@ Use /list to see all stocks
             logger.info(f"Processing command: {text}")
             response = self.process_command(text)
             self.send_message(response)
+    def start_polling(self):
+        """Start a continuous loop to check for commands (for background thread)."""
+        logger.info("Bot command polling started (Background Thread)")
+        while True:
+            try:
+                self.check_and_handle_commands()
+            except Exception as e:
+                logger.error(f"Error in bot polling loop: {e}")
+                import time
+                time.sleep(5)  # Wait before retrying on error

@@ -6,6 +6,7 @@ import os
 import json
 import time
 import schedule
+import threading
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -208,6 +209,10 @@ class StockMonitorAgent:
         # Run immediately on startup
         self.run_monitoring_cycle()
         
+        # Start bot command polling in a background thread for instant response
+        bot_thread = threading.Thread(target=self.bot_handler.start_polling, daemon=True)
+        bot_thread.start()
+        
         # Schedule periodic checks - will be updated dynamically
         schedule.clear()
         interval_minutes = self.monitoring_config.get('check_interval_minutes', 15)
@@ -221,9 +226,6 @@ class StockMonitorAgent:
             while True:
                 schedule.run_pending()
                 
-                # Check for bot commands frequently (between monitoring cycles)
-                self.bot_handler.check_and_handle_commands()
-                
                 # Check if interval changed and reschedule if needed
                 current_interval = self.monitoring_config.get('check_interval_minutes', 15)
                 if current_interval != last_interval:
@@ -236,7 +238,7 @@ class StockMonitorAgent:
                         f"Now checking every {current_interval} minutes"
                     )
                 
-                time.sleep(10)  # Check for commands/pending tasks every 10 seconds
+                time.sleep(1)  # Main loop sleep
         except KeyboardInterrupt:
             logger.info("Monitoring stopped by user")
             self.telegram.send_message(
