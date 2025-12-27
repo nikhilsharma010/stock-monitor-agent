@@ -246,31 +246,59 @@ This platform is free and open-source, but running the AI models and infrastruct
             news_mon = NewsMonitor()
             news = news_mon.get_company_news(ticker, days_back=60)
             
-            # 5. Get AI Deep Commentary
-            commentary = self.analyzer.get_ai_commentary(ticker, metrics, quote, news=news, profile=profile)
+            # 5. Fetch Performance Metrics (New for 5.1)
+            performance = self.analyzer.get_performance_metrics(ticker)
+            
+            # 6. Get AI Deep Commentary
+            commentary = self.analyzer.get_ai_commentary(ticker, metrics, quote, news=news, profile=profile, performance=performance)
             
             # Format report
             name = profile.get('name', ticker)
             industry = profile.get('finnhubIndustry', 'N/A')
-            sector = profile.get('finnhubSector', 'N/A')
             
+            # Helper for indicators
+            def get_dir(val):
+                if isinstance(val, (int, float)):
+                    return "🟢" if val > 0 else "🔴" if val < 0 else "⚪️"
+                return "⚪️"
+
+            m1d = get_dir(quote.get('percent_change', 0))
+            m5d = get_dir(performance.get('5d_pct', 0))
+            m1m = get_dir(performance.get('1m_pct', 0))
+            
+            # Format volume
+            curr_vol = performance.get('curr_vol', 'N/A')
+            vol_str = f"{curr_vol:,.0f}" if isinstance(curr_vol, (int, float)) else "N/A"
+            avg_vol = metrics.get('volume_avg_10d', 'N/A')
+            avg_vol_str = f"{avg_vol:,.0f}" if isinstance(avg_vol, (int, float)) else "N/A"
+
+            p5d = performance.get('5d_pct', 'N/A')
+            p5d_str = f"{p5d:+.2f}%" if isinstance(p5d, (int, float)) else "N/A"
+            p1m = performance.get('1m_pct', 'N/A')
+            p1m_str = f"{p1m:+.2f}%" if isinstance(p1m, (int, float)) else "N/A"
+
             report = (
                 f"🧠 <b>OPERATOR SNAPSHOT: {ticker}</b>\n"
                 f"<i>{name} | {industry}</i>\n"
                 f"────────────────────────\n"
-                f"📊 <b>PERFORMANCE & SCALE</b>\n"
+                f"📈 <b>MOMENTUM & SCALE</b>\n"
                 f"<code>"
-                f"Price:  ${quote['current_price']:,.2f} ({quote['percent_change']:+.2f}%)\n"
-                f"Cap:    {metrics['market_cap']}M\n"
-                f"Range:  ${metrics['52_week_low']} - ${metrics['52_week_high']}\n"
-                f"P/E:    {metrics['pe_ratio']}"
+                f"1D Performance: {m1d} {quote['percent_change']:+.2f}%\n"
+                f"5D Performance: {m5d} {p5d_str}\n"
+                f"1M Performance: {m1m} {p1m_str}\n"
+                f"Market Cap:     {metrics['market_cap']}M"
+                f"</code>\n\n"
+                f"📊 <b>VOLUME CONVICTION</b>\n"
+                f"<code>"
+                f"Current Vol:    {vol_str}\n"
+                f"10D Avg Vol:    {avg_vol_str}"
                 f"</code>\n\n"
                 f"💰 <b>CORE FUNDAMENTALS</b>\n"
                 f"<code>"
-                f"Rev. Growth: {metrics['revenue_growth']}\n"
-                f"Net Margin:  {metrics['net_margin']}\n"
-                f"ROIC:        {metrics['roic']}\n"
-                f"Debt/Equity: {metrics['debt_to_equity']}"
+                f"P/E Ratio:      {metrics['pe_ratio']}\n"
+                f"Net Margin:     {metrics['net_margin']}%\n"
+                f"Rev. Growth:    {metrics['revenue_growth']}%\n"
+                f"ROIC:           {metrics['roic']}%"
                 f"</code>\n\n"
                 f"⚡️ <b>FIRST-PRINCIPLES ANALYSIS</b>\n"
                 f"{commentary}\n"

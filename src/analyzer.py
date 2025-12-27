@@ -3,8 +3,9 @@ Analyzer module for deep stock financials and AI commentary using Groq.
 """
 import os
 import requests
+import logging
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from groq import Groq
 from utils import logger
 
@@ -55,7 +56,8 @@ class StockAnalyzer:
                 'revenue_growth': 'N/A',
                 'eps_growth': 'N/A',
                 'roic': 'N/A',
-                'debt_to_equity': 'N/A'
+                'debt_to_equity': 'N/A',
+                'volume_avg_10d': 'N/A'
             }
             
             if data.get('metric'):
@@ -72,13 +74,58 @@ class StockAnalyzer:
                     'revenue_growth': m.get('revenueGrowthYoy', 'N/A'),
                     'eps_growth': m.get('epsGrowthYoy', 'N/A'),
                     'roic': m.get('roicTTM', 'N/A'),
-                    'debt_to_equity': m.get('totalDebt/totalEquityTTM', 'N/A')
+                    'debt_to_equity': m.get('totalDebt/totalEquityTTM', 'N/A'),
+                    'volume_avg_10d': m.get('10DayAverageTradingVolume', 'N/A')
                 })
             
             return result
         except Exception as e:
             logger.error(f"Error fetching financials for {ticker}: {e}")
             return result # Returns N/A template
+
+    def get_performance_metrics(self, ticker):
+        """Calculate multi-timeframe returns and current volume profiling."""
+        try:
+            # Get ~40 days of daily data to ensure we have 1 month of trading days
+            end = int(time.time())
+            start = end - (40 * 24 * 60 * 60)
+            
+            url = f"{self.finnhub_base_url}/stock/candle"
+            params = {
+                'symbol': ticker,
+                'resolution': 'D',
+                'from': start,
+                'to': end,
+                'token': self.finnhub_api_key
+            }
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            perf = {'5d_pct': 'N/A', '1m_pct': 'N/A', 'curr_vol': 'N/A'}
+            
+            if data.get('s') == 'ok' and len(data.get('c', [])) > 1:
+                closes = data['c']
+                vols = data['v']
+                curr_price = closes[-1]
+                
+                # 5D Return (or max available)
+                idx_5d = max(0, len(closes) - 6) # -1 is current, -6 is 5 days ago
+                price_5d = closes[idx_5d]
+                perf['5d_pct'] = ((curr_price / price_5d) - 1) * 100
+                
+                # 1M Return (approx 21 trading days)
+                idx_1m = max(0, len(closes) - 22)
+                price_1m = closes[idx_1m]
+                perf['1m_pct'] = ((curr_price / price_1m) - 1) * 100
+                
+                # Current Volume (today's candle)
+                perf['curr_vol'] = vols[-1]
+            
+            return perf
+        except Exception as e:
+            logger.error(f"Error calculating performance for {ticker}: {e}")
+            return {'5d_pct': 'N/A', '1m_pct': 'N/A', 'curr_vol': 'N/A'}
 
     def get_company_profile(self, ticker):
         """Fetch company profile (Industry, Sector, Description)."""
@@ -123,7 +170,7 @@ class StockAnalyzer:
             logger.error(f"Error fetching quote for {ticker}: {e}")
             return None
 
-    def get_ai_commentary(self, ticker, metrics, quote, news=None, question=None, profile=None):
+    def get_ai_commentary(self, ticker, metrics, quote, news=None, question=None, profile=None, performance=None):
         """Generate Deep AI commentary using Groq."""
         # Dynamic re-check for key if missing
         if not self.client:
@@ -140,7 +187,13 @@ class StockAnalyzer:
         
         try:
             # Context Preparation
-            price_context = f"Price: ${quote['current_price']} ({quote['percent_change']}%)" if quote else "Price N/A"
+            price_context = f"Price: ${quote['current_price']} ({quote['percent_change']}%). "
+            if performance:
+                price_context += (
+                    f"Performance: 5D({performance['5d_pct']:.2f}%), 1M({performance['1m_pct']:.2f}%). "
+                    f"Volume: {performance['curr_vol']} vs 10D Avg: {metrics['volume_avg_10d']}."
+                )
+            
             industry = profile.get('finnhubIndustry', 'Unknown Industry') if profile else "Unknown Industry"
             
             metrics_str = (
@@ -167,11 +220,12 @@ class StockAnalyzer:
                     "CORE RULES:\n"
                     "1. FIRST PRINCIPLES: Analyze the narrative based on structural drivers, not just price.\n"
                     "2. MACRO CONTEXT: Consider industry trends or macro shifts (rates, regulation).\n"
-                    "3. RICH FORMATTING: Use bold for headers and critical terms. Use italics for nuanced interpretations.\n"
-                    "4. AESTHETICS: Use consistent emojis (e.g., 🔴 for risks, 📊 for data, 🏭 for industry).\n"
-                    "5. STRICT BULLETS: Use only bullet points for all sections. No paragraphs.\n"
-                    "6. ZERO HALLUCINATION: If a metric is 'N/A', do not interpret it. Say 'Insufficient Data'.\n"
-                    "7. OPERATOR UX: Be concise. Max 200 words total."
+                    "3. CONVICTION: Use volume and multi-timeframe returns to gauge momentum strength.\n"
+                    "4. RICH FORMATTING: Use bold for headers and critical terms. Use italics for nuanced interpretations.\n"
+                    "5. AESTHETICS: Use consistent emojis (e.g., 🔴 for risks, 📊 for data, 🏭 for industry).\n"
+                    "6. STRICT BULLETS: Use only bullet points for all sections. No paragraphs.\n"
+                    "7. ZERO HALLUCINATION: If a metric is 'N/A', do not interpret it. Say 'Insufficient Data'.\n"
+                    "8. OPERATOR UX: Be concise. Max 200 words total."
                 )
                 user_prompt = (
                     f"Perform a 'Deep Intelligence' report for {ticker} over the last 60 days.\n\n"
