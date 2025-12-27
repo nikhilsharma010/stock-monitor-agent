@@ -266,6 +266,9 @@ Use /list to see all stocks
     
     def handle_debug(self):
         """Show diagnostic information."""
+        from dotenv import load_dotenv
+        load_dotenv() # Refresh just in case
+        
         vars_to_check = ['FINNHUB_API_KEY', 'TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID', 'GROQ_API_KEY', 'GROQ_KEY']
         lines = ["🔎 <b>System Debug Information</b>\n"]
         
@@ -274,6 +277,12 @@ Use /list to see all stocks
             status = "✅ Found" if val else "❌ Missing"
             masked = f"{val[:5]}...{val[-4:]}" if val and len(val) > 10 else "N/A"
             lines.append(f"• {var}: {status} ({masked})")
+            
+        # Search for similar named keys
+        all_keys = os.environ.keys()
+        similar = [k for k in all_keys if 'GROQ' in k or 'KEY' in k]
+        if similar:
+            lines.append(f"\nPotential Matches Found: {', '.join(similar)}")
             
         lines.append(f"\nModel Initialized: {'✅ Yes' if self.analyzer.client else '❌ No'}")
         lines.append(f"Process ID: {os.getpid()}")
