@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, Decimal, Date, Boolean, Text, JSON
+from sqlalchemy import Column, String, DateTime, Numeric, Date, Boolean, Text, JSON
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
 import uuid
@@ -22,10 +22,10 @@ class Goal(Base):
     user_id = Column(String, nullable=False, index=True)
     name = Column(String, nullable=False)
     category = Column(String)
-    target_amount = Column(Decimal, nullable=False)
-    current_amount = Column(Decimal, default=0)
+    target_amount = Column(Numeric(precision=15, scale=2), nullable=False)
+    current_amount = Column(Numeric(precision=15, scale=2), default=0)
     target_date = Column(Date, nullable=False)
-    monthly_contribution = Column(Decimal)
+    monthly_contribution = Column(Numeric(precision=15, scale=2))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -39,8 +39,8 @@ class Thesis(Base):
     catalysts = Column(JSON)  # Array of strings
     risks = Column(JSON)  # Array of strings
     stocks = Column(JSON)  # Array of {ticker, allocation, reason}
-    performance = Column(Decimal)
-    vs_market = Column(Decimal)
+    performance = Column(Numeric(precision=10, scale=2))
+    vs_market = Column(Numeric(precision=10, scale=2))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -61,6 +61,6 @@ class Alert(Base):
     user_id = Column(String, nullable=False, index=True)
     ticker = Column(String, nullable=False)
     alert_type = Column(String, nullable=False)  # 'above' or 'below'
-    target_price = Column(Decimal, nullable=False)
+    target_price = Column(Numeric(precision=15, scale=2), nullable=False)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
