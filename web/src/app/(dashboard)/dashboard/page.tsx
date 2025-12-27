@@ -1,15 +1,15 @@
-import { currentUser } from '@clerk/nextjs'
+import { auth } from '@clerk/nextjs/server'
 import { TrendingUp, TrendingDown, DollarSign, Target } from 'lucide-react'
 
 export default async function DashboardPage() {
-    const user = await currentUser()
+    const { userId } = await auth()
 
     return (
         <div className="space-y-8">
             {/* Welcome Header */}
             <div>
                 <h1 className="text-3xl font-bold text-white mb-2">
-                    Welcome back, {user?.firstName || 'Investor'}! 👋
+                    Welcome back! 👋
                 </h1>
                 <p className="text-gray-400">
                     Here's your market overview for today
