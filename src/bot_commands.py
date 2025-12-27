@@ -38,7 +38,9 @@ class TelegramBotHandler:
             me_resp = requests.get(f"{self.api_url}/getMe", timeout=10)
             if me_resp.ok:
                 bot_info = me_resp.json().get('result', {})
-                logger.info(f"Bot authenticated as @{bot_info.get('username')} (ID: {bot_info.get('id')})")
+                self.bot_username = bot_info.get('username')
+                self.bot_id = bot_info.get('id')
+                logger.info(f"Bot authenticated as @{self.bot_username} (ID: {self.bot_id})")
             
             # Reset
             requests.get(f"{self.api_url}/deleteWebhook", timeout=10)
@@ -259,11 +261,14 @@ This platform is free and open-source, but running the AI models and infrastruct
             # 5. Fetch Performance Metrics (New for 5.1)
             performance = self.analyzer.get_performance_metrics(ticker)
             
-            # 6. Fetch Alpha Intel (New for 8.0)
+            # 6. Fetch user risk profile (Phase 10)
+            risk = self.cache.get_user_risk(user_id)
+            
+            # 7. Fetch Alpha Intel
             alpha_intel = self.analyzer.get_alpha_intelligence(ticker)
             
-            # 7. Get AI Deep Commentary
-            commentary = self.analyzer.get_ai_commentary(ticker, metrics, quote, news=news, profile=profile, performance=performance, alpha_intel=alpha_intel)
+            # 8. Get AI Deep Commentary
+            commentary = self.analyzer.get_ai_commentary(ticker, metrics, quote, news=news, profile=profile, performance=performance, alpha_intel=alpha_intel, risk_profile=risk)
             
             # Format report
             name = profile.get('name', ticker)
@@ -367,9 +372,10 @@ This platform is free and open-source, but running the AI models and infrastruct
             quote = self.analyzer.get_stock_quote(ticker)
             profile = self.analyzer.get_company_profile(ticker)
             
+            risk = self.cache.get_user_risk(chat_id) # assuming chat_id matches user_id for DM
             alpha = self.analyzer.get_alpha_intelligence(ticker)
             
-            answer = self.analyzer.get_ai_commentary(ticker, metrics, quote, question=question, profile=profile, alpha_intel=alpha)
+            answer = self.analyzer.get_ai_commentary(ticker, metrics, quote, question=question, profile=profile, alpha_intel=alpha, risk_profile=risk)
             return f"🤖 <b>AI Answer for {ticker}:</b>\n\n{answer}{self.FINANCIAL_DISCLAIMER}"
         except Exception as e:
             logger.error(f"Error in handle_ask: {e}", exc_info=True)
@@ -537,6 +543,12 @@ This platform is free and open-source, but running the AI models and infrastruct
                 return "🏓 <b>Pong!</b> Bot is online and responsive.", None
             elif command == '/undervalued' or command == '/alpha' or command == '/discovery':
                 return self.handle_undervalued(chat_id), None
+            elif command == '/risk':
+                return self.handle_risk(chat_id)
+            elif command == '/premarket':
+                return self.handle_premarket(chat_id), None
+            elif command == '/sectors':
+                return self.handle_sectors(), None
             elif command == '/donate':
                 return self.handle_donate(), None
             else:
@@ -568,6 +580,13 @@ This platform is free and open-source, but running the AI models and infrastruct
         elif action == 'industry':
             report = self.analyzer.get_industry_analysis(ticker)
             self.telegram_notifier.send_message(report + self.FINANCIAL_DISCLAIMER, chat_id=chat_id)
+        elif action == 'setrisk':
+            # ticker here is the risk profile name
+            success = self.cache.set_user_risk(chat_id, ticker)
+            if success:
+                self.telegram_notifier.send_message(f"✅ <b>Risk Profile set to: {ticker}</b>\nFuture reports will be tailored to this strategy.", chat_id=chat_id)
+            else:
+                self.telegram_notifier.send_message("❌ Failed to update risk profile.", chat_id=chat_id)
         elif action == 'prompt_compare':
             self.telegram_notifier.send_message(f"🔍 <b>To compare {ticker}</b>, type: <code>/compare {ticker} TICKER2</code>", chat_id=chat_id)
 
@@ -580,6 +599,101 @@ This platform is free and open-source, but running the AI models and infrastruct
         except Exception as e:
             logger.error(f"Error in handle_undervalued: {e}")
             return "❌ Alpha Discovery failed. Please try again."
+
+    def handle_risk(self, chat_id):
+        """Allow user to select their risk profile."""
+        current = self.cache.get_user_risk(chat_id)
+        msg = f"🛡️ <b>RISK PROFILING</b>\nYour current profile is: <b>{current}</b>\n\nSelect a strategy to tailor AI reports:"
+        keyboard = {"inline_keyboard": [
+            [
+                {"text": "🚀 Degen (Aggressive)", "callback_data": "setrisk:Degen"},
+                {"text": "⚖️ Balanced (Moderate)", "callback_data": "setrisk:Moderate"}
+            ],
+            [
+                {"text": "🏦 Builder (Conservative)", "callback_data": "setrisk:Builder"}
+            ]
+        ]}
+        return msg, json.dumps(keyboard)
+
+    def handle_premarket(self, chat_id):
+        """Generate pre-market briefing."""
+        risk = self.cache.get_user_risk(chat_id)
+        wl = self.cache.get_user_watchlist(chat_id)
+        self.send_message("☕️ <b>Brewing your Pre-Market Alpha Briefing...</b>\nAnalyzing global sector rotation and your watchlist. Please wait.", chat_id=chat_id)
+        report = self.analyzer.get_pre_market_briefing(risk_profile=risk, watchlist=wl)
+        return f"📍 <b>PRE-MARKET ALPHA: The Institutional Brief</b>\n\n{report}{self.FINANCIAL_DISCLAIMER}"
+
+    def handle_sectors(self):
+        """Display sector rotation performance."""
+        trends = self.analyzer.get_sector_trends()
+        if not trends: return "❌ Failed to fetch sector data."
+        
+        lines = ["🏁 <b>SECTOR ROTATION (Last 24h)</b>\n"]
+        lines.append("<code>")
+        for t in trends:
+            lines.append(f"{t['name']:<18} {t['change']:>+7.2f}%")
+        lines.append("</code>")
+        return "\n".join(lines)
+
+    def handle_voice(self, message):
+        """Transcribe and process voice messages."""
+        chat_id = message['chat'].get('id')
+        user_id = message.get('from', {}).get('id')
+        voice = message.get('voice')
+        if not voice: return
+        
+        file_id = voice['file_id']
+        self.send_message("🎙️ <b>Processing Voice Signal...</b>", chat_id=chat_id)
+        
+        try:
+            # 1. Get file path
+            resp = requests.get(f"{self.api_url}/getFile", params={'file_id': file_id})
+            file_path = resp.json()['result']['file_path']
+            file_url = f"https://api.telegram.org/file/bot{self.bot_token}/{file_path}"
+            
+            # 2. Download
+            audio_data = requests.get(file_url).content
+            file_name = f"voice_{file_id}.oga"
+            with open(file_name, 'wb') as f:
+                f.write(audio_data)
+            
+            # 3. Transcribe via Groq
+            if not self.analyzer.client:
+                return "❌ AI Transcription offline."
+            
+            with open(file_name, 'rb') as audio_file:
+                transcription = self.analyzer.client.audio.transcriptions.create(
+                    file=(file_name, audio_file.read()),
+                    model="whisper-large-v3",
+                    response_format="text",
+                )
+            
+            # Clean up
+            if os.path.exists(file_name): os.remove(file_name)
+            
+            trans_text = str(transcription).strip()
+            self.send_message(f"📝 <b>Transcribed:</b> \"{trans_text}\"", chat_id=chat_id)
+            
+            # 4. Route to handle_ask if it looks like a ticker query
+            # We assume any voice note for now is a question for the AI analyst
+            # Or we can try to find a ticker in the text
+            words = trans_text.upper().split()
+            potential_ticker = None
+            for w in words:
+                if len(w) <= 5 and w.isalpha():
+                    # Check if it's a known ticker or just use it
+                    potential_ticker = w
+                    break
+            
+            if potential_ticker:
+                response = self.handle_ask(f"{potential_ticker} {trans_text}", chat_id)
+                self.send_message(response, chat_id=chat_id)
+            else:
+                self.send_message("🔬 <b>AI Insight:</b> I couldn't identify a specific ticker in your message. Try mentioning a symbol like 'AAPL' or 'NVDA'.", chat_id=chat_id)
+                
+        except Exception as e:
+            logger.error(f"Voice processing failed: {e}")
+            self.send_message(f"❌ Voice processing failed: {str(e)}", chat_id=chat_id)
 
     def check_and_handle_commands(self):
         """Check for new commands and callback queries."""
@@ -603,11 +717,35 @@ This platform is free and open-source, but running the AI models and infrastruct
             user_id = user.get('id')
             username = user.get('username', 'N/A')
             
+            if 'voice' in message:
+                self.handle_voice(message)
+                continue
+
             if 'text' not in message:
                 continue
             
             text = message['text']
+            
+            # Handle Group Mentions
+            if message['chat']['type'] in ['group', 'supergroup']:
+                if not text.startswith('/') and f"@{self.bot_username}" not in text:
+                    continue # Ignore normal chatter in groups
+            
             if not text.startswith('/'):
+                # Process as natural language if it doesn't start with / but in DM
+                if message['chat']['type'] == 'private':
+                    # Find a ticker and route to /ask
+                    words = text.upper().split()
+                    ticker = None
+                    for w in words:
+                        if len(w) <= 5 and w.isalpha():
+                            ticker = w
+                            break
+                    if ticker:
+                        resp = self.handle_ask(f"{ticker} {text}", chat_id)
+                        self.send_message(resp, chat_id=chat_id)
+                    else:
+                        self.send_message("🤖 I'm here! Tell me a ticker (e.g., AAPL) or ask a question.", chat_id=chat_id)
                 continue
             
             logger.info(f"📥 COMMAND RECEIVED: '{text}' from @{username} (Chat: {chat_id})")

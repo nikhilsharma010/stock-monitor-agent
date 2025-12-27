@@ -49,6 +49,7 @@ class CacheDB:
                 user_id TEXT PRIMARY KEY,
                 username TEXT,
                 first_name TEXT,
+                risk_profile TEXT DEFAULT 'Moderate',
                 last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 command_count INTEGER DEFAULT 0
             )
@@ -186,6 +187,32 @@ class CacheDB:
         except Exception as e:
             logger.error(f"Error fetching usage metrics: {e}")
             return {}
+
+    def set_user_risk(self, user_id, risk):
+        """Set a user's risk profile."""
+        try:
+            conn = sqlite3.connect(self.db_path, timeout=30)
+            cursor = conn.cursor()
+            cursor.execute('UPDATE users SET risk_profile = ? WHERE user_id = ?', (risk, str(user_id)))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            logger.error(f"Error setting risk for {user_id}: {e}")
+            return False
+
+    def get_user_risk(self, user_id):
+        """Get a user's risk profile."""
+        try:
+            conn = sqlite3.connect(self.db_path, timeout=30)
+            cursor = conn.cursor()
+            cursor.execute('SELECT risk_profile FROM users WHERE user_id = ?', (str(user_id),))
+            row = cursor.fetchone()
+            conn.close()
+            return row[0] if row else 'Moderate'
+        except Exception as e:
+            logger.error(f"Error getting risk for {user_id}: {e}")
+            return 'Moderate'
 
     # --- WATCHLIST METHODS ---
 

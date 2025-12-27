@@ -36,6 +36,12 @@ class StockAnalyzer:
         return None
 
     CORE_ALPHA_LIST = ['NVDA', 'TSLA', 'AAPL', 'MSFT', 'AMZN', 'GOOGL', 'META', 'NFLX', 'AMD', 'AVGO', 'ASML', 'PLTR', 'SNOW', 'MDB', 'CRWD', 'ZS', 'PANW', 'NET', 'DDOG', 'OKTA']
+    SECTOR_ETFS = {
+        'XLK': 'Technology', 'XLF': 'Financials', 'XLV': 'Health Care', 
+        'XLE': 'Energy', 'XLY': 'Consumer Disc', 'XLI': 'Industrials', 
+        'XLC': 'Communication', 'XLB': 'Materials', 'XLU': 'Utilities', 
+        'XLP': 'Consumer Staples'
+    }
 
     def __init__(self, finnhub_api_key=None, groq_api_key=None):
         self.finnhub_api_key = finnhub_api_key or os.getenv('FINNHUB_API_KEY')
@@ -193,7 +199,7 @@ class StockAnalyzer:
             logger.error(f"Error fetching yfinance quote for {ticker}: {e}")
             return None
 
-    def get_ai_commentary(self, ticker, metrics, quote, news=None, question=None, profile=None, performance=None, alpha_intel=None):
+    def get_ai_commentary(self, ticker, metrics, quote, news=None, question=None, profile=None, performance=None, alpha_intel=None, risk_profile='Moderate'):
         """Generate Deep AI commentary using Groq."""
         # Dynamic re-check for key if missing
         if not self.client:
@@ -264,9 +270,10 @@ class StockAnalyzer:
                     "TASK: Perform a 'Unified Intelligence' analysis (Macro context + Recent 'Why').\n"
                     "CORE RULES:\n"
                     "1. BALANCED PERSPECTIVE: You must provide both Bull and Bear cases.\n"
-                    "2. NARRATIVE DRIVEN: Analyze the 30-day window. If news is thin, interpret moves vs. industry benchmarks or clinical/product cycles (e.g. Phase 2 trials).\n"
-                    "3. RICH FORMATTING: Use bold for headers. Use only bullet points.\n"
-                    "4. OPERATOR UX: Be direct. Max 200 words."
+                    f"2. RISK PROFILE: The user is a '{risk_profile}' investor. Tailor the advice accordingly.\n"
+                    "3. NARRATIVE DRIVEN: Analyze the 30-day window.\n"
+                    "4. RICH FORMATTING: Use bold for headers. Use only bullet points.\n"
+                    "5. OPERATOR UX: Be direct. Max 200 words."
                 )
                 user_prompt = (
                     f"Perform a 'Deep Intelligence' report for {ticker}.\n\n"
@@ -672,3 +679,67 @@ FORMAT:
         except Exception as e:
             logger.error(f"Error in undervalued picks: {e}")
             return "❌ Alpha Discovery failed."
+
+    def get_sector_trends(self):
+        """Fetch daily performance for all major sectors."""
+        trends = []
+        try:
+            tickers_str = " ".join(self.SECTOR_ETFS.keys())
+            data = yf.download(tickers_str, period="2d", group_by='ticker', progress=False)
+            
+            for ticker, name in self.SECTOR_ETFS.items():
+                if ticker in data:
+                    t_data = data[ticker]
+                    if len(t_data) >= 2:
+                        curr = t_data['Close'].iloc[-1]
+                        prev = t_data['Close'].iloc[-2]
+                        chg = ((curr / prev) - 1) * 100
+                        trends.append({'ticker': ticker, 'name': name, 'change': chg})
+            
+            return sorted(trends, key=lambda x: x['change'], reverse=True)
+        except Exception as e:
+            logger.error(f"Error fetching sector trends: {e}")
+            return []
+
+    def get_pre_market_briefing(self, risk_profile='Moderate', watchlist=None):
+        """Generate a high-impact Pre-Market Alpha Briefing."""
+        if not self.client: return "AI Advisor is offline."
+        try:
+            trends = self.get_sector_trends()
+            top_sector = trends[0] if trends else {'name': 'Unknown', 'change': 0}
+            bottom_sector = trends[-1] if trends else {'name': 'Unknown', 'change': 0}
+            
+            sector_context = "\n".join([f"- {t['name']}: {t['change']:+.2f}%" for t in trends])
+            
+            # Watchlist context if any
+            wl_str = "None"
+            if watchlist:
+                wl_str = ", ".join(watchlist[:10])
+
+            system_prompt = (
+                "You are an Institutional Level Alpha Advisor.\n"
+                f"USER PROFILE: {risk_profile} Investor.\n"
+                "TASK: Provide a Pre-Market 'Strategic Briefing'.\n"
+                "STRUCTURE:\n"
+                "1. 🏛️ STATE OF THE MARKET: Briefly interpret sector rotation.\n"
+                "2. 🏹 TACTICAL OPS (Today's Money): Short-term sector/stock picks with high momentum/volume.\n"
+                "3. 💎 STRATEGIC WEALTH (Future Money): Long-term structural trends (e.g. AI, Green Energy, Infrastructure) and value setups.\n"
+                "RULES: Be sharp, expert-toned, and use bolding for impact."
+            )
+            
+            user_prompt = (
+                f"Sector Trends (Last 24h):\n{sector_context}\n\n"
+                f"User Watchlist: {wl_str}\n\n"
+                "Provide the Pre-Market Alpha Briefing."
+            )
+            
+            completion = self.client.chat.completions.create(
+                messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
+                model=self.model,
+                temperature=0.3,
+                max_tokens=500
+            )
+            return completion.choices[0].message.content
+        except Exception as e:
+            logger.error(f"Error in pre-market briefing: {e}")
+            return "❌ Pre-Market briefing generation failed."
