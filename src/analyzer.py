@@ -405,11 +405,10 @@ FORMAT:
             return None, f"Data fetch error: {str(e)}"
 
     def get_ai_technical_insights(self, ticker, context):
-        """Generate a concise AI interpretation of technical signals."""
+        """Generate a concise, explainable, and actionable technical analysis."""
         if not self.client: return "AI technical analysis is currently unavailable."
         
         try:
-            # Prepare readable context
             p = context['price']
             d20 = context['dma20']
             d50 = context['dma50']
@@ -417,21 +416,27 @@ FORMAT:
             rsi = context['rsi']
             
             system_prompt = (
-                "You are a Chartered Market Technician (CMT). "
-                "Analyze the provided technical data and give a high-density, professional interpretation. "
-                "Rules: 1. Max 80 words. 2. Use bullet points. 3. Focus on trend and momentum signals."
+                "You are an Elite Proprietary Trader & Market Technician.\n"
+                "TASK: Analyze the provided technical data with high 'Explainability' and 'Actionability'.\n"
+                "RULES:\n"
+                "1. EXPLAIN THE WHY: Don't just list values. Explain what they imply for price psychology.\n"
+                "2. BE ACTIONABLE: Provide a specific tactical level or outlook (e.g., 'Watch for a bounce at $X').\n"
+                "3. FORMAT: Use the 3 specific headers below. Max 120 words. Use bolding."
             )
             
             data_str = (
                 f"Ticker: {ticker}\n"
-                f"Price: ${p:.2f}\n"
-                f"DMA20: {f'{d20:.2f}' if pd.notnull(d20) else 'N/A'}\n"
-                f"DMA50: {f'{d50:.2f}' if pd.notnull(d50) else 'N/A'}\n"
-                f"DMA200: {f'{d200:.2f}' if pd.notnull(d200) else 'N/A'}\n"
-                f"RSI(14): {f'{rsi:.1f}' if pd.notnull(rsi) else 'N/A'}"
+                f"Current Price: ${p:.2f}\n"
+                f"Indicators: DMA20({d20:.2f}), DMA50({d50:.2f}), DMA200({d200:.2f}), RSI(14)={rsi:.1f}"
             )
             
-            user_prompt = f"Data:\n{data_str}\n\nProvide the 'Technical Verdict' (Trend, Support/Resistance, and Momentum)."
+            user_prompt = (
+                f"DATA:\n{data_str}\n\n"
+                "REQUIRED FORMAT:\n"
+                "• 🛰️ <b>THE SIGNAL</b>: [Identify dominant trend/pattern]\n"
+                "• 🧠 <b>EXPLAINABILITY</b>: [Explain WHY this matters for the stock's physics]\n"
+                "• ⚡ <b>ACTIONABLE STRATEGY</b>: [Specific tactical entry/support or risk management level]"
+            )
 
             completion = self.client.chat.completions.create(
                 messages=[
@@ -440,9 +445,9 @@ FORMAT:
                 ],
                 model=self.model,
                 temperature=0.2,
-                max_tokens=250
+                max_tokens=400
             )
             return completion.choices[0].message.content
         except Exception as e:
-            logger.error(f"Error generating technical insights for {ticker}: {e}")
+            logger.error(f"Error generating explainable insights for {ticker}: {e}")
             return "⚠️ Technical interpretation failed."
