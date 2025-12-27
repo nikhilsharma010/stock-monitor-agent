@@ -319,6 +319,19 @@ Built with ❤️ for serious market participants.
         # Use chat_id as fallback for user_id
         u_id = user_id or chat_id
         ticker = ticker.upper().strip()
+        
+        # Check if ticker already has market suffix
+        if not (ticker.endswith('.NS') or ticker.endswith('.BO')):
+            # Show market selection buttons for ambiguous tickers
+            msg = f"🌍 <b>Select Market for {ticker}</b>\n\nIs this an Indian or US stock?"
+            keyboard = {"inline_keyboard": [
+                [
+                    {"text": "🇮🇳 India (NSE)", "callback_data": f"market:NSE:{ticker}"},
+                    {"text": "🇺🇸 United States", "callback_data": f"market:US:{ticker}"}
+                ]
+            ]}
+            return msg, json.dumps(keyboard)
+        
         self.send_message(f"🔍 <b>Generating Deep Intelligence Report for {ticker}...</b>\nFetching 60 days of context and sector trends. Please wait.", chat_id=chat_id)
         
         try:
@@ -652,7 +665,31 @@ Built with ❤️ for serious market participants.
         
         if not data: return
         
-        action, ticker = data.split(':') if ':' in data else (data, '')
+        action, ticker = data.split(':', 1) if ':' in data else (data, '')
+        
+        # Handle market selection callbacks
+        if action == 'market':
+            # Format: market:NSE:TICKER or market:US:TICKER
+            parts = data.split(':', 2)
+            if len(parts) == 3:
+                _, market, base_ticker = parts
+                # Apply market suffix
+                if market == 'NSE':
+                    resolved_ticker = f"{base_ticker}.NS"
+                    flag = "🇮🇳"
+                elif market == 'BSE':
+                    resolved_ticker = f"{base_ticker}.BO"
+                    flag = "🇮🇳"
+                else:  # US
+                    resolved_ticker = base_ticker
+                    flag = "🇺🇸"
+                
+                # Execute the original command with resolved ticker
+                # Determine which command was originally called (stored in message text if needed)
+                # For now, default to snapshot
+                msg, kb = self.handle_analyse(resolved_ticker, chat_id, user_id)
+                self.telegram_notifier.send_message(msg, chat_id=chat_id, reply_markup=kb)
+            return
         
         if action == 'chart':
             self.handle_chart(ticker, chat_id)
