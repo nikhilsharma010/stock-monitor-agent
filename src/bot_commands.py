@@ -76,81 +76,34 @@ class TelegramBotHandler:
             logger.error(f"Failed to send message: {e}")
             return False
     
-    def handle_add_stock(self, ticker):
-        """Add a stock to monitoring list."""
-        config = self.load_config()
-        if not config:
-            return "❌ Failed to load configuration"
-        
+    def handle_add_stock(self, ticker, user_id):
+        """Add a stock to user's personal watchlist."""
         ticker = ticker.upper().strip()
-        
-        # Check if already exists
-        for stock in config['stocks']:
-            if stock['ticker'] == ticker:
-                if stock.get('enabled', True):
-                    return f"ℹ️ {ticker} is already being monitored"
-                else:
-                    stock['enabled'] = True
-                    self.save_config(config)
-                    return f"✅ Re-enabled monitoring for {ticker}"
-        
-        # Add new stock
-        config['stocks'].append({
-            'ticker': ticker,
-            'name': ticker,
-            'enabled': True
-        })
-        
-        if self.save_config(config):
-            return f"✅ Added {ticker} to monitoring list!\n\nChanges will take effect on next check cycle."
+        if self.cache.add_to_watchlist(user_id, ticker):
+            return f"✅ Added {ticker} to your watchlist!\nYou will now receive price and news alerts for this stock."
         else:
-            return "❌ Failed to save configuration"
+            return f"❌ Failed to add {ticker}. Try again later."
     
-    def handle_remove_stock(self, ticker):
-        """Remove a stock from monitoring list."""
-        config = self.load_config()
-        if not config:
-            return "❌ Failed to load configuration"
-        
+    def handle_remove_stock(self, ticker, user_id):
+        """Remove a stock from user's personal watchlist."""
         ticker = ticker.upper().strip()
-        
-        for stock in config['stocks']:
-            if stock['ticker'] == ticker:
-                stock['enabled'] = False
-                if self.save_config(config):
-                    return f"✅ Disabled monitoring for {ticker}\n\nChanges will take effect on next check cycle."
-                else:
-                    return "❌ Failed to save configuration"
-        
-        return f"❌ {ticker} not found in monitoring list"
+        if self.cache.remove_from_watchlist(user_id, ticker):
+            return f"✅ Removed {ticker} from your watchlist."
+        else:
+            return f"❌ Failed to remove {ticker} or ticker not found."
     
-    def handle_list_stocks(self):
-        """List all monitored stocks."""
-        config = self.load_config()
-        if not config:
-            return "❌ Failed to load configuration"
+    def handle_list_stocks(self, user_id):
+        """List user's personal monitored stocks."""
+        tickers = self.cache.get_user_watchlist(user_id)
         
-        active = [s for s in config['stocks'] if s.get('enabled', True)]
-        disabled = [s for s in config['stocks'] if not s.get('enabled', True)]
+        if not tickers:
+            return "📭 <b>Your Watchlist is Empty</b>\n\nUse /add TICKER to start monitoring stocks."
         
-        message = "📊 <b>Monitored Stocks</b>\n\n"
+        message = "📊 <b>Your Personal Watchlist</b>\n\n"
+        for ticker in sorted(tickers):
+            message += f"  • {ticker}\n"
         
-        if active:
-            message += "<b>Active:</b>\n"
-            for stock in active:
-                message += f"  • {stock['ticker']} - {stock.get('name', stock['ticker'])}\n"
-        
-        if disabled:
-            message += "\n<b>Disabled:</b>\n"
-            for stock in disabled:
-                message += f"  • {stock['ticker']} - {stock.get('name', stock['ticker'])}\n"
-        
-        interval = config.get('monitoring', {}).get('check_interval_minutes', 15)
-        threshold = config.get('monitoring', {}).get('price_change_threshold_percent', 0.5)
-        
-        message += f"\n⏱️ Check interval: {interval} minutes"
-        message += f"\n📈 Price threshold: {threshold}%"
-        
+        message += "\nUse /analyse TICKER for deep insights!"
         return message
     
     def handle_set_interval(self, minutes):
@@ -185,8 +138,9 @@ class TelegramBotHandler:
 • /remove TICKER - Stop tracking
 • /list - Show monitored stocks
 • /analyse TICKER - AI Analysis & Rating
+• /compare T1 T2 - Side-by-side comparison
 • /ask TICKER QUESTION - Ask AI anything
-• /status - Show agent status
+• /status - Show system status
 • /interval MIN - Set check interval
 • /debug - Check API key status
 """
@@ -197,7 +151,7 @@ class TelegramBotHandler:
         if not config:
             return "❌ Failed to load configuration"
         
-        active_stocks = [s for s in config['stocks'] if s.get('enabled', True)]
+        active_stocks = self.cache.get_all_monitored_tickers()
         interval = config.get('monitoring', {}).get('check_interval_minutes', 15)
         threshold = config.get('monitoring', {}).get('price_change_threshold_percent', 0.5)
         
@@ -205,19 +159,19 @@ class TelegramBotHandler:
         metrics = self.cache.get_usage_metrics()
         
         return f"""
-📊 <b>Agent Status</b>
+📊 <b>System Status</b>
 
-🔹 Monitoring: {len(active_stocks)} stocks
+🔹 Multi-user Mode: ✅ Active
+🔹 Total Tickers Monitored: {len(active_stocks)} 
 🔹 Check interval: {interval} minutes
 🔹 Price threshold: {threshold}%
-🔹 News alerts: {'All news' if config.get('monitoring', {}).get('notify_all_news', True) else 'Major only'}
 
 📈 <b>Usage Metrics</b>
 🔹 Total Users: {metrics.get('total_users', 0)}
 🔹 Total Commands: {metrics.get('total_commands', 0)}
 🔹 Active (24h): {metrics.get('active_users_24h', 0)}
 
-Use /list to see all stocks
+Use /list to see your personal stocks.
 """
 
     def handle_analyse(self, ticker):
@@ -272,6 +226,36 @@ Use /list to see all stocks
         answer = self.analyzer.get_ai_commentary(ticker, metrics, quote, question=question)
         return f"🤖 <b>AI Answer for {ticker}:</b>\n\n{answer}"
     
+    def handle_compare(self, args):
+        """Compare two stock tickers."""
+        tickers = args.upper().strip().split()
+        if len(tickers) < 2:
+            return "❌ Usage: /compare TICKER1 TICKER2\nExample: /compare AAPL MSFT"
+        
+        t1, t2 = tickers[0], tickers[1]
+        self.send_message(f"⚖️ <b>Comparing {t1} vs {t2}...</b>\nGathering data and AI comparison. This will take a moment.")
+        
+        try:
+            # Gather data for both
+            m1 = self.analyzer.get_basic_financials(t1)
+            q1 = self.analyzer.get_stock_quote(t1)
+            
+            m2 = self.analyzer.get_basic_financials(t2)
+            q2 = self.analyzer.get_stock_quote(t2)
+            
+            if not m1 or not m2:
+                return f"❌ Failed to fetch data for one of the symbols: {t1} or {t2}."
+
+            # Use analyzer to get comparison commentary
+            # We'll create a special method for this in analyzer.py next
+            commentary = self.analyzer.get_ai_comparison(t1, m1, q1, t2, m2, q2)
+            
+            return f"⚖️ <b>Stock Comparison: {t1} vs {t2}</b>\n\n{commentary}"
+            
+        except Exception as e:
+            logger.error(f"Error in handle_compare: {e}")
+            return f"❌ Failed to compare stocks: {str(e)}"
+    
     def handle_debug(self):
         """Show diagnostic information."""
         from dotenv import load_dotenv
@@ -297,7 +281,7 @@ Use /list to see all stocks
         lines.append(f"Server Time: {datetime.now().strftime('%H:%M:%S')}")
         return "\n".join(lines)
     
-    def process_command(self, message_text):
+    def process_command(self, message_text, user_id):
         """Process a command message."""
         try:
             parts = message_text.strip().split(maxsplit=1)
@@ -311,13 +295,13 @@ Use /list to see all stocks
             elif command == '/add':
                 if not args:
                     return "❌ Usage: /add TICKER\nExample: /add AAPL"
-                return self.handle_add_stock(args)
+                return self.handle_add_stock(args, user_id)
             elif command == '/remove':
                 if not args:
                     return "❌ Usage: /remove TICKER\nExample: /remove BYND"
-                return self.handle_remove_stock(args)
+                return self.handle_remove_stock(args, user_id)
             elif command == '/list':
-                return self.handle_list_stocks()
+                return self.handle_list_stocks(user_id)
             elif command == '/interval':
                 if not args:
                     return "❌ Usage: /interval MINUTES\nExample: /interval 5"
@@ -332,6 +316,8 @@ Use /list to see all stocks
                 if not args:
                     return "❌ Usage: /ask TICKER QUESTION\nExample: /ask CCCC What does this company do?"
                 return self.handle_ask(args)
+            elif command == '/compare':
+                return self.handle_compare(args)
             elif command == '/debug':
                 return self.handle_debug()
             else:
@@ -382,8 +368,8 @@ Use /list to see all stocks
             self.cache.log_user_command(user_id, username, first_name, cmd_name, cmd_args)
             
             logger.info(f"Processing command: {text} from user {username}")
-            response = self.process_command(text)
-            self.send_message(response)
+            response = self.process_command(text, user_id)
+            self.send_message(response, chat_id=chat_id)
     def start_polling(self):
         """Start a continuous loop to check for commands (for background thread)."""
         logger.info("Bot command polling started (Background Thread)")

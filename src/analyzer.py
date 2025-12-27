@@ -159,3 +159,48 @@ class StockAnalyzer:
         except Exception as e:
             logger.error(f"Error generating AI commentary for {ticker}: {str(e)}")
             return f"⚠️ Failed to generate AI commentary with Groq: {str(e)}"
+
+    def get_ai_comparison(self, t1, m1, q1, t2, m2, q2):
+        """Generate a side-by-side AI comparison of two stocks."""
+        if not self.client:
+            return "AI comparison is currently disabled (missing GROQ_API_KEY)."
+        
+        try:
+            comparison_context = f"""
+Stock 1: {t1}
+- P/E: {m1['pe_ratio']}
+- Market Cap: {m1['market_cap']}M
+- Price: ${q1['current_price']} ({q1['percent_change']}%)
+- 52W Range: ${m1['52_week_low']} - ${m1['52_week_high']}
+
+Stock 2: {t2}
+- P/E: {m2['pe_ratio']}
+- Market Cap: {m2['market_cap']}M
+- Price: ${q2['current_price']} ({q2['percent_change']}%)
+- 52W Range: ${m2['52_week_low']} - ${m2['52_week_high']}
+"""
+            system_prompt = "You are a world-class equity researcher. Compare two stocks and give a clear verdict on which is the better investment right now."
+            user_prompt = f"""
+Compare the following two stocks based on the data provided:
+{comparison_context}
+
+Task:
+1. Briefly compare their valuations (P/E) and market positioning.
+2. Analyze their recent price action relative to their 52-week ranges.
+3. Verdict: Which one is a better buy today? Provide a 1-sentence justification.
+"""
+            chat_completion = self.client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                model=self.model,
+                temperature=0.2,
+                max_tokens=800
+            )
+            
+            return chat_completion.choices[0].message.content
+            
+        except Exception as e:
+            logger.error(f"Error in AI comparison: {e}")
+            return f"⚠️ AI Comparison failed: {str(e)}"

@@ -57,25 +57,21 @@ class StockMonitorAgent:
             return {'stocks': [], 'monitoring': {}}
     
     def check_stock_updates(self):
-        """Check for stock price updates and send notifications."""
-        logger.info("Checking stock updates...")
+        """Check for stock price updates and send notifications to all subscribers."""
+        logger.info("Checking stock updates for all monitored tickers...")
         
-        for stock_config in self.stocks:
-            if not stock_config.get('enabled', True):
-                continue
-            
-            ticker = stock_config['ticker']
-            company_name = stock_config.get('name', ticker)
-            
+        tickers = self.cache.get_all_monitored_tickers()
+        if not tickers:
+            logger.info("No tickers currently on any user watchlists.")
+            return
+
+        for ticker in tickers:
             # Fetch stock data
             stock_data = self.stock_monitor.get_stock_data(ticker)
-            
             if not stock_data:
-                logger.warning(f"No data available for {ticker}")
                 continue
             
-            # Use company name from config or API
-            company_name = stock_config.get('name') or stock_data.get('name', ticker)
+            company_name = stock_data.get('name', ticker)
             
             # Check if we should notify based on price change
             price_threshold = self.monitoring_config.get('price_change_threshold_percent', 5.0)
@@ -88,13 +84,16 @@ class StockMonitorAgent:
                 content_hash = generate_content_hash(content)
                 
                 if not self.cache.is_duplicate(content_hash):
-                    # Send notification
-                    self.telegram.send_stock_alert(
-                        ticker=ticker,
-                        company_name=company_name,
-                        price=stock_data['current_price'],
-                        change_percent=stock_data['change_percent']
-                    )
+                    # Get all subscribers for this ticker
+                    subscribers = self.cache.get_subscribers(ticker)
+                    for chat_id in subscribers:
+                        self.telegram.send_stock_alert(
+                            ticker=ticker,
+                            company_name=company_name,
+                            price=stock_data['current_price'],
+                            change_percent=stock_data['change_percent'],
+                            chat_id=chat_id
+                        )
                     
                     # Add to cache
                     self.cache.add_notification(
@@ -105,52 +104,53 @@ class StockMonitorAgent:
                     )
     
     def check_news_updates(self):
-        """Check for news updates and send notifications."""
-        logger.info("Checking news updates...")
+        """Check for news updates and send notifications to all subscribers."""
+        logger.info("Checking news updates for all monitored tickers...")
         
+        tickers = self.cache.get_all_monitored_tickers()
+        if not tickers:
+            return
+
         notify_all = self.monitoring_config.get('notify_all_news', True)
         
-        for stock_config in self.stocks:
-            if not stock_config.get('enabled', True):
-                continue
-            
-            ticker = stock_config['ticker']
-            company_name = stock_config.get('name', ticker)
-            
+        for ticker in tickers:
             # Fetch news (last 24 hours)
             articles = self.news_monitor.get_company_news(ticker, days_back=1)
-            
             if not articles:
-                logger.info(f"No news for {ticker}")
                 continue
             
             # Filter to recent news (last check interval)
             check_interval = self.monitoring_config.get('check_interval_minutes', 15)
             recent_articles = self.news_monitor.filter_recent_news(
                 articles, 
-                hours=check_interval / 60 * 2  # Check 2x the interval to avoid missing news
+                hours=check_interval / 60 * 2
             )
             
-            logger.info(f"Found {len(recent_articles)} recent articles for {ticker}")
+            if not recent_articles:
+                continue
+
+            # Need company name for the alert
+            stock_data = self.stock_monitor.get_stock_data(ticker)
+            company_name = stock_data.get('name', ticker) if stock_data else ticker
             
             # Send notifications for new articles
             for article in recent_articles:
-                # Generate hash for deduplication
-                content_hash = generate_content_hash(
-                    f"{ticker}_{article['headline']}_{article['datetime']}"
-                )
+                content_hash = generate_content_hash(f"{ticker}_{article['headline']}_{article['datetime']}")
                 
                 if not self.cache.is_duplicate(content_hash):
                     if notify_all:
-                        # Send notification
-                        self.telegram.send_news_alert(
-                            ticker=ticker,
-                            company_name=company_name,
-                            headline=article['headline'],
-                            summary=article.get('summary', 'No summary available')[:300],
-                            url=article.get('url', ''),
-                            source=article.get('source', '')
-                        )
+                        # Get all subscribers for this ticker
+                        subscribers = self.cache.get_subscribers(ticker)
+                        for chat_id in subscribers:
+                            self.telegram.send_news_alert(
+                                ticker=ticker,
+                                company_name=company_name,
+                                headline=article['headline'],
+                                summary=article.get('summary', 'No summary available')[:300],
+                                url=article.get('url', ''),
+                                source=article.get('source', ''),
+                                chat_id=chat_id
+                            )
                         
                         # Add to cache
                         self.cache.add_notification(
@@ -159,8 +159,6 @@ class StockMonitorAgent:
                             notification_type='news',
                             title=article['headline'][:100]
                         )
-                        
-                        # Small delay to avoid rate limiting
                         time.sleep(1)
     
     def run_monitoring_cycle(self):

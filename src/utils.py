@@ -64,6 +64,15 @@ class CacheDB:
             )
         ''')
         
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS user_watchlists (
+                user_id TEXT,
+                ticker TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, ticker)
+            )
+        ''')
+        
         conn.commit()
         conn.close()
         logger.info(f"Database initialized at {self.db_path}")
@@ -177,6 +186,79 @@ class CacheDB:
         except Exception as e:
             logger.error(f"Error fetching usage metrics: {e}")
             return {}
+
+    # --- WATCHLIST METHODS ---
+
+    def add_to_watchlist(self, user_id, ticker):
+        """Add a ticker to a user's personal watchlist."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute(
+                'INSERT OR IGNORE INTO user_watchlists (user_id, ticker) VALUES (?, ?)',
+                (str(user_id), ticker.upper())
+            )
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            logger.error(f"Error adding to watchlist: {e}")
+            return False
+
+    def remove_from_watchlist(self, user_id, ticker):
+        """Remove a ticker from a user's personal watchlist."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute(
+                'DELETE FROM user_watchlists WHERE user_id = ? AND ticker = ?',
+                (str(user_id), ticker.upper())
+            )
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            logger.error(f"Error removing from watchlist: {e}")
+            return False
+
+    def get_user_watchlist(self, user_id):
+        """Get all tickers watched by a specific user."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute('SELECT ticker FROM user_watchlists WHERE user_id = ?', (str(user_id),))
+            tickers = [row[0] for row in cursor.fetchall()]
+            conn.close()
+            return tickers
+        except Exception as e:
+            logger.error(f"Error getting user watchlist: {e}")
+            return []
+
+    def get_all_monitored_tickers(self):
+        """Get a set of all unique tickers watched by any user."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute('SELECT DISTINCT ticker FROM user_watchlists')
+            tickers = [row[0] for row in cursor.fetchall()]
+            conn.close()
+            return set(tickers)
+        except Exception as e:
+            logger.error(f"Error getting all tickers: {e}")
+            return set()
+
+    def get_subscribers(self, ticker):
+        """Get all user_ids watching a specific ticker."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute('SELECT user_id FROM user_watchlists WHERE ticker = ?', (ticker.upper(),))
+            user_ids = [row[0] for row in cursor.fetchall()]
+            conn.close()
+            return user_ids
+        except Exception as e:
+            logger.error(f"Error getting subscribers for {ticker}: {e}")
+            return []
 
 
 def generate_content_hash(content):

@@ -13,30 +13,30 @@ class TelegramNotifier:
         self.bot_token = bot_token or os.getenv('TELEGRAM_BOT_TOKEN')
         self.chat_id = chat_id or os.getenv('TELEGRAM_CHAT_ID')
         
-        if not self.bot_token or not self.chat_id:
-            raise ValueError(
-                "Telegram credentials not found. "
-                "Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID environment variables."
-            )
+        if not self.bot_token:
+            raise ValueError("TELEGRAM_BOT_TOKEN not found.")
         
         self.api_url = f"https://api.telegram.org/bot{self.bot_token}"
         logger.info("Telegram notifier initialized")
     
-    def send_message(self, message, parse_mode='HTML'):
+    def send_message(self, message, chat_id=None, parse_mode='HTML'):
         """
         Send a message via Telegram.
         
         Args:
             message: Text message to send
+            chat_id: Optional recipient chat ID (falls back to default)
             parse_mode: 'HTML' or 'Markdown' for formatting
-        
-        Returns:
-            bool: True if successful, False otherwise
         """
+        target_chat_id = chat_id or self.chat_id
+        if not target_chat_id:
+            logger.error("No chat_id provided and no default chat_id set.")
+            return False
+
         try:
             url = f"{self.api_url}/sendMessage"
             payload = {
-                'chat_id': self.chat_id,
+                'chat_id': target_chat_id,
                 'text': message,
                 'parse_mode': parse_mode,
                 'disable_web_page_preview': False
@@ -52,7 +52,7 @@ class TelegramNotifier:
             logger.error(f"Failed to send Telegram message: {e}")
             return False
     
-    def send_stock_alert(self, ticker, company_name, price, change_percent, news_count=0):
+    def send_stock_alert(self, ticker, company_name, price, change_percent, news_count=0, chat_id=None):
         """
         Send a stock price alert.
         
@@ -62,6 +62,7 @@ class TelegramNotifier:
             price: Current stock price
             change_percent: Price change percentage
             news_count: Number of news items
+            chat_id: Optional recipient chat ID
         """
         emoji = "📈" if change_percent > 0 else "📉" if change_percent < 0 else "➡️"
         
@@ -76,9 +77,9 @@ class TelegramNotifier:
         if news_count > 0:
             message += f"📰 News Items: {news_count}\n"
         
-        return self.send_message(message)
+        return self.send_message(message, chat_id=chat_id)
     
-    def send_news_alert(self, ticker, company_name, headline, summary, url, source=''):
+    def send_news_alert(self, ticker, company_name, headline, summary, url, source='', chat_id=None):
         """
         Send a news alert.
         
@@ -89,6 +90,7 @@ class TelegramNotifier:
             summary: News summary
             url: Article URL
             source: News source
+            chat_id: Optional recipient chat ID
         """
         message = f"""
 📰 <b>News Alert: {ticker}</b>
@@ -106,7 +108,7 @@ class TelegramNotifier:
         if url:
             message += f'\n🔗 <a href="{url}">Read more</a>'
         
-        return self.send_message(message)
+        return self.send_message(message, chat_id=chat_id)
     
     def test_connection(self):
         """Test the Telegram bot connection."""
