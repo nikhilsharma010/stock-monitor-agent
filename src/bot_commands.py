@@ -220,10 +220,10 @@ Use /list to see all stocks
             if not metrics:
                 return f"❌ Failed to fetch financial metrics for {ticker}. The symbol might be incorrect or API limit reached."
             
-            history = self.analyzer.get_price_history(ticker) or []
+            quote = self.analyzer.get_stock_quote(ticker)
             
             # Get AI commentary
-            commentary = self.analyzer.get_ai_commentary(ticker, metrics, history)
+            commentary = self.analyzer.get_ai_commentary(ticker, metrics, quote)
             
             # Format metrics summary
             summary = (
@@ -253,13 +253,13 @@ Use /list to see all stocks
         self.send_message(f"🤔 <b>Consulting AI about {ticker}...</b>")
         
         metrics = self.analyzer.get_basic_financials(ticker)
-        history = self.analyzer.get_price_history(ticker)
+        quote = self.analyzer.get_stock_quote(ticker)
         
         # We try to get news too if possible for better context
         # But we don't have direct access to NewsMonitor here easily without passing it
         # Let's stick to metrics and history for now, or fetch news inside analyzer
         
-        answer = self.analyzer.get_ai_commentary(ticker, metrics, history, question=question)
+        answer = self.analyzer.get_ai_commentary(ticker, metrics, quote, question=question)
         return f"🤖 <b>AI Answer for {ticker}:</b>\n\n{answer}"
     
     def process_command(self, message_text):

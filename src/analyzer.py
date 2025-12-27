@@ -53,49 +53,51 @@ class StockAnalyzer:
             logger.error(f"Error fetching financials for {ticker}: {e}")
             return None
 
-    def get_price_history(self, ticker, days=15):
-        """Fetch daily closing prices for the last N days."""
+    def get_stock_quote(self, ticker):
+        """Fetch current stock price and daily change."""
         try:
-            end_time = int(time.time())
-            start_time = int((datetime.now() - timedelta(days=days)).timestamp())
-            
-            url = f"{self.finnhub_base_url}/stock/candle"
+            url = f"{self.finnhub_base_url}/quote"
             params = {
                 'symbol': ticker,
-                'resolution': 'D',
-                'from': start_time,
-                'to': end_time,
                 'token': self.finnhub_api_key
             }
             response = requests.get(url, params=params, timeout=10)
             response.raise_for_status()
             data = response.json()
             
-            if data.get('s') != 'ok':
+            if not data.get('c'):  # Current price missing
                 return None
             
-            # Format history
-            history = []
-            for i in range(len(data['c'])):
-                dt = datetime.fromtimestamp(data['t'][i]).strftime('%Y-%m-%d')
-                history.append({'date': dt, 'close': data['c'][i]})
-            
-            return history
+            return {
+                'current_price': data['c'],
+                'change': data['d'],
+                'percent_change': data['dp'],
+                'high': data['h'],
+                'low': data['l'],
+                'open': data['o'],
+                'previous_close': data['pc']
+            }
         except Exception as e:
-            logger.error(f"Error fetching history for {ticker}: {e}")
+            logger.error(f"Error fetching quote for {ticker}: {e}")
             return None
 
-    def get_ai_commentary(self, ticker, metrics, history, news=None, question=None):
+    def get_ai_commentary(self, ticker, metrics, quote, news=None, question=None):
         """Generate AI commentary using Google Gemini."""
         if not self.model:
             return "AI commentary is currently disabled (missing API key)."
         
         try:
             # Prepare context for AI
-            if history:
-                history_str = "\n".join([f"{h['date']}: ${h['close']}" for h in history[-5:]])
+            if quote:
+                price_context = (
+                    f"Current Price: ${quote['current_price']}\n"
+                    f"Today's Change: ${quote['change']} ({quote['percent_change']}%)\n"
+                    f"Day's Range: ${quote['low']} - ${quote['high']}\n"
+                    f"Previous Close: ${quote['previous_close']}"
+                )
             else:
-                history_str = "Price history not available for this period."
+                price_context = "Current price action data not available."
+
             metrics_str = (
                 f"P/E Ratio: {metrics['pe_ratio']}\n"
                 f"Market Cap: {metrics['market_cap']}M\n"
@@ -112,18 +114,17 @@ class StockAnalyzer:
             if question:
                 prompt = (
                     f"You are a seasoned financial analyst. Answer the following question about {ticker}.\n\n"
-                    f"Context Data:\n{metrics_str}\n\nRecent Price Action:\n{history_str}\n{news_str}\n\n"
+                    f"Context Data:\n{metrics_str}\n\nRecent Price Action:\n{price_context}\n{news_str}\n\n"
                     f"Question: {question}\n\n"
-                    "Provide a precise, factual answer. If you are asked about competitors or business model, "
-                    "use your internal knowledge but keep the answer grounded in the provided data where relevant."
+                    "Provide a precise, factual answer. Use your internal knowledge and the provided data."
                 )
             else:
                 prompt = (
                     f"You are a seasoned financial analyst. Provide a fundamental analysis for {ticker}.\n\n"
-                    f"Financial Metrics:\n{metrics_str}\n\nRecent Price History (Last 5 days):\n{history_str}\n{news_str}\n"
+                    f"Financial Metrics:\n{metrics_str}\n\nRecent Price Action:\n{price_context}\n{news_str}\n"
                     "\nTask:\n"
                     "1. Summarize the company's current financial health.\n"
-                    "2. Analyze recent price trends.\n"
+                    "2. Analyze recent price trends based on the day's movement and 52W range.\n"
                     "3. Give a clear 'Buy/Hold/Sell' recommendation with a 1-sentence justification.\n\n"
                     "Be professional, concise, and focused on data."
                 )
