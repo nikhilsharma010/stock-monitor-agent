@@ -23,6 +23,13 @@ class TelegramBotHandler:
         self.cache = cache or CacheDB()
         self.analyzer = StockAnalyzer()
         
+        # Clear any existing webhooks on startup to ensure getUpdates works
+        try:
+            requests.get(f"{self.api_url}/deleteWebhook", timeout=10)
+            logger.info("Bot command handler: Webhook cleared successfully.")
+        except Exception as e:
+            logger.warning(f"Failed to clear webhook: {e}")
+        
     def load_config(self):
         """Load current configuration."""
         try:
@@ -56,7 +63,10 @@ class TelegramBotHandler:
             
             data = response.json()
             if data.get('ok') and data.get('result'):
-                return data['result']
+                updates = data['result']
+                if updates:
+                    logger.info(f"Received {len(updates)} new updates from Telegram.")
+                return updates
             return []
         except Exception as e:
             logger.debug(f"Error getting updates: {e}")
