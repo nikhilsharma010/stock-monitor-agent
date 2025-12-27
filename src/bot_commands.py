@@ -275,6 +275,8 @@ Use /list to see all stocks
             lines.append(f"• {var}: {status} ({masked})")
             
         lines.append(f"\nModel Initialized: {'✅ Yes' if self.analyzer.client else '❌ No'}")
+        lines.append(f"Process ID: {os.getpid()}")
+        lines.append(f"Server Time: {datetime.now().strftime('%H:%M:%S')}")
         return "\n".join(lines)
     
     def process_command(self, message_text):
