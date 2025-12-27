@@ -53,143 +53,134 @@ class StockAnalyzer:
             logger.warning("StockAnalyzer: No Groq key found in environment.")
 
     def get_basic_financials(self, ticker):
-        """Fetch high-density financial metrics (Margins, Growth, Efficiency)."""
+        """Fetch high-density financial metrics using yfinance."""
+        result = {
+            'pe_ratio': 'N/A',
+            'market_cap': 'N/A',
+            '52_week_high': 'N/A',
+            '52_week_low': 'N/A',
+            'beta': 'N/A',
+            'ps_ratio': 'N/A',
+            'net_margin': 'N/A',
+            'operating_margin': 'N/A',
+            'revenue_growth': 'N/A',
+            'eps_growth': 'N/A',
+            'roic': 'N/A',
+            'debt_to_equity': 'N/A',
+            'volume_avg_10d': 'N/A'
+        }
         try:
-            url = f"{self.finnhub_base_url}/stock/metric"
-            params = {
-                'symbol': ticker,
-                'metric': 'all',
-                'token': self.finnhub_api_key
-            }
-            response = requests.get(url, params=params, timeout=10)
-            response.raise_for_status()
-            data = response.json()
+            symbol = yf.Ticker(ticker)
+            info = symbol.info
             
-            # Expanded N/A template
-            result = {
-                'pe_ratio': 'N/A',
-                'market_cap': 'N/A',
-                '52_week_high': 'N/A',
-                '52_week_low': 'N/A',
-                'beta': 'N/A',
-                'ps_ratio': 'N/A',
-                'net_margin': 'N/A',
-                'operating_margin': 'N/A',
-                'revenue_growth': 'N/A',
-                'eps_growth': 'N/A',
-                'roic': 'N/A',
-                'debt_to_equity': 'N/A',
-                'volume_avg_10d': 'N/A'
-            }
-            
-            if data.get('metric'):
-                m = data['metric']
-                result.update({
-                    'pe_ratio': m.get('peExclExtraTTM', 'N/A'),
-                    'market_cap': m.get('marketCapitalization', 'N/A'),
-                    '52_week_high': m.get('52WeekHigh', 'N/A'),
-                    '52_week_low': m.get('52WeekLow', 'N/A'),
-                    'beta': m.get('beta', 'N/A'),
-                    'ps_ratio': m.get('psTTM', 'N/A'),
-                    'net_margin': m.get('netProfitMarginTTM', 'N/A'),
-                    'operating_margin': m.get('operatingMarginTTM', 'N/A'),
-                    'revenue_growth': m.get('revenueGrowthYoy', 'N/A'),
-                    'eps_growth': m.get('epsGrowthYoy', 'N/A'),
-                    'roic': m.get('roicTTM', 'N/A'),
-                    'debt_to_equity': m.get('totalDebt/totalEquityTTM', 'N/A'),
-                    'volume_avg_10d': m.get('10DayAverageTradingVolume', 'N/A')
-                })
-            
+            # Formatting helper
+            def fmt(val, multiplier=1, suffix="", is_pct=False):
+                if val is None or val == 'N/A': return 'N/A'
+                try:
+                    v = float(val) * multiplier
+                    if is_pct: return f"{v:.1f}%"
+                    if v > 1e9: return f"{v/1e9:.1f}B"
+                    if v > 1e6: return f"{v/1e6:.1f}M"
+                    return f"{v:.2f}{suffix}"
+                except: return 'N/A'
+
+            result.update({
+                'pe_ratio': fmt(info.get('trailingPE')),
+                'market_cap': fmt(info.get('marketCap')),
+                '52_week_high': fmt(info.get('fiftyTwoWeekHigh')),
+                '52_week_low': fmt(info.get('fiftyTwoWeekLow')),
+                'beta': fmt(info.get('beta')),
+                'ps_ratio': fmt(info.get('priceToSalesTrailing12Months')),
+                'net_margin': fmt(info.get('profitMargins'), 100),
+                'operating_margin': fmt(info.get('operatingMargins'), 100),
+                'revenue_growth': fmt(info.get('revenueGrowth'), 100),
+                'eps_growth': fmt(info.get('earningsGrowth'), 100),
+                'roic': fmt(info.get('returnOnAssets'), 100), # Using ROA as high-confidence proxy
+                'debt_to_equity': fmt(info.get('debtToEquity')),
+                'volume_avg_10d': fmt(info.get('averageVolume10days'))
+            })
             return result
         except Exception as e:
-            logger.error(f"Error fetching financials for {ticker}: {e}")
-            return result # Returns N/A template
+            logger.error(f"Error fetching yfinance financials for {ticker}: {e}")
+            return result
 
     def get_performance_metrics(self, ticker):
-        """Calculate multi-timeframe returns and current volume profiling."""
+        """Calculate multi-timeframe returns using yfinance."""
+        perf = {'5d_pct': 'N/A', '1m_pct': 'N/A', 'curr_vol': 'N/A'}
         try:
-            # Get ~40 days of daily data to ensure we have 1 month of trading days
-            end = int(time.time())
-            start = end - (40 * 24 * 60 * 60)
+            symbol = yf.Ticker(ticker)
+            df = symbol.history(period="1mo")
             
-            url = f"{self.finnhub_base_url}/stock/candle"
-            params = {
-                'symbol': ticker,
-                'resolution': 'D',
-                'from': start,
-                'to': end,
-                'token': self.finnhub_api_key
-            }
-            response = requests.get(url, params=params, timeout=10)
-            response.raise_for_status()
-            data = response.json()
+            if df.empty or len(df) < 2:
+                return perf
             
-            perf = {'5d_pct': 'N/A', '1m_pct': 'N/A', 'curr_vol': 'N/A'}
+            closes = df['Close'].tolist()
+            vols = df['Volume'].tolist()
+            curr_price = closes[-1]
             
-            if data.get('s') == 'ok' and len(data.get('c', [])) > 1:
-                closes = data['c']
-                vols = data['v']
-                curr_price = closes[-1]
-                
-                # 5D Return (or max available)
-                idx_5d = max(0, len(closes) - 6) # -1 is current, -6 is 5 days ago
-                price_5d = closes[idx_5d]
+            # 5D Return
+            if len(closes) >= 6:
+                price_5d = closes[-6]
                 perf['5d_pct'] = ((curr_price / price_5d) - 1) * 100
                 
-                # 1M Return (approx 21 trading days)
-                idx_1m = max(0, len(closes) - 22)
-                price_1m = closes[idx_1m]
-                perf['1m_pct'] = ((curr_price / price_1m) - 1) * 100
-                
-                # Current Volume (today's candle)
-                perf['curr_vol'] = vols[-1]
+            # 1M Return
+            price_1m = closes[0]
+            perf['1m_pct'] = ((curr_price / price_1m) - 1) * 100
+            
+            # Current Volume
+            perf['curr_vol'] = vols[-1]
             
             return perf
         except Exception as e:
-            logger.error(f"Error calculating performance for {ticker}: {e}")
-            return {'5d_pct': 'N/A', '1m_pct': 'N/A', 'curr_vol': 'N/A'}
+            logger.error(f"Error calculating yfinance performance for {ticker}: {e}")
+            return perf
 
     def get_company_profile(self, ticker):
-        """Fetch company profile (Industry, Sector, Description)."""
+        """Fetch company profile using yfinance."""
         try:
-            url = f"{self.finnhub_base_url}/stock/profile2"
-            params = {
-                'symbol': ticker,
-                'token': self.finnhub_api_key
+            symbol = yf.Ticker(ticker)
+            info = symbol.info
+            return {
+                'name': info.get('longName', ticker),
+                'finnhubIndustry': info.get('industry', 'N/A'),
+                'sector': info.get('sector', 'N/A'),
+                'description': info.get('longBusinessSummary', 'N/A'),
+                'website': info.get('website', 'N/A')
             }
-            response = requests.get(url, params=params, timeout=10)
-            response.raise_for_status()
-            return response.json()
         except Exception as e:
-            logger.error(f"Error fetching profile for {ticker}: {e}")
+            logger.error(f"Error fetching yfinance profile for {ticker}: {e}")
             return {}
 
     def get_stock_quote(self, ticker):
-        """Fetch current stock price and daily change."""
+        """Fetch current stock price and change using yfinance."""
         try:
-            url = f"{self.finnhub_base_url}/quote"
-            params = {
-                'symbol': ticker,
-                'token': self.finnhub_api_key
-            }
-            response = requests.get(url, params=params, timeout=10)
-            response.raise_for_status()
-            data = response.json()
+            symbol = yf.Ticker(ticker)
+            # Fast way to get current price for most stocks
+            info = symbol.info
+            curr = info.get('currentPrice')
+            prev = info.get('previousClose')
             
-            if not data.get('c'):  # Current price missing
-                return None
+            if curr is None:
+                # Fallback to history for 1 day
+                df = symbol.history(period="2d")
+                if df.empty: return None
+                curr = df['Close'].iloc[-1]
+                prev = df['Close'].iloc[-2] if len(df) > 1 else curr
+            
+            change = curr - prev
+            pct_change = (change / prev) * 100 if prev else 0
             
             return {
-                'current_price': data['c'],
-                'change': data['d'],
-                'percent_change': data['dp'],
-                'high': data['h'],
-                'low': data['l'],
-                'open': data['o'],
-                'previous_close': data['pc']
+                'current_price': curr,
+                'change': change,
+                'percent_change': pct_change,
+                'high': info.get('dayHigh', curr),
+                'low': info.get('dayLow', curr),
+                'open': info.get('open', curr),
+                'previous_close': prev
             }
         except Exception as e:
-            logger.error(f"Error fetching quote for {ticker}: {e}")
+            logger.error(f"Error fetching yfinance quote for {ticker}: {e}")
             return None
 
     def get_ai_commentary(self, ticker, metrics, quote, news=None, question=None, profile=None, performance=None):
