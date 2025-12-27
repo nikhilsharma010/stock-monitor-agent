@@ -7,8 +7,6 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'shared'))
 
 from analyzer import StockAnalyzer
-from social_intelligence import SocialIntelligence
-from context_builder import ContextBuilder
 
 app = FastAPI(
     title="Alpha Intelligence API",
@@ -51,7 +49,7 @@ async def get_stock_analysis(ticker: str):
             "profile": analyzer.get_company_profile(ticker)
         }
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": str(e), "ticker": ticker}
 
 @app.get("/api/stocks/{ticker}/chart")
 async def get_stock_chart(ticker: str):
