@@ -44,6 +44,26 @@ class CacheDB:
             )
         ''')
         
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                user_id TEXT PRIMARY KEY,
+                username TEXT,
+                first_name TEXT,
+                last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                command_count INTEGER DEFAULT 0
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS usage_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT,
+                command TEXT,
+                args TEXT,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
         conn.commit()
         conn.close()
         logger.info(f"Database initialized at {self.db_path}")
@@ -101,6 +121,62 @@ class CacheDB:
         
         logger.info(f"Cleaned up {deleted} old entries from cache")
         return deleted
+
+    def log_user_command(self, user_id, username, first_name, command, args=''):
+        """Log a user's command and update their profile."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # Upsert user
+            cursor.execute('''
+                INSERT INTO users (user_id, username, first_name, last_seen, command_count)
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP, 1)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    username = excluded.username,
+                    first_name = excluded.first_name,
+                    last_seen = CURRENT_TIMESTAMP,
+                    command_count = users.command_count + 1
+            ''', (str(user_id), username, first_name))
+            
+            # Log usage
+            cursor.execute('''
+                INSERT INTO usage_logs (user_id, command, args)
+                VALUES (?, ?, ?)
+            ''', (str(user_id), command, args))
+            
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            logger.error(f"Error logging user command: {e}")
+            return False
+
+    def get_usage_metrics(self):
+        """Fetch summary metrics for growth and usage."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            metrics = {}
+            
+            # Total users
+            cursor.execute('SELECT COUNT(*) FROM users')
+            metrics['total_users'] = cursor.fetchone()[0]
+            
+            # Total commands
+            cursor.execute('SELECT COUNT(*) FROM usage_logs')
+            metrics['total_commands'] = cursor.fetchone()[0]
+            
+            # Active users (last 24h)
+            cursor.execute("SELECT COUNT(*) FROM users WHERE last_seen > datetime('now', '-1 day')")
+            metrics['active_users_24h'] = cursor.fetchone()[0]
+            
+            conn.close()
+            return metrics
+        except Exception as e:
+            logger.error(f"Error fetching usage metrics: {e}")
+            return {}
 
 
 def generate_content_hash(content):

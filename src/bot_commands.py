@@ -201,6 +201,9 @@ class TelegramBotHandler:
         interval = config.get('monitoring', {}).get('check_interval_minutes', 15)
         threshold = config.get('monitoring', {}).get('price_change_threshold_percent', 0.5)
         
+        # Get usage metrics
+        metrics = self.cache.get_usage_metrics()
+        
         return f"""
 📊 <b>Agent Status</b>
 
@@ -208,6 +211,11 @@ class TelegramBotHandler:
 🔹 Check interval: {interval} minutes
 🔹 Price threshold: {threshold}%
 🔹 News alerts: {'All news' if config.get('monitoring', {}).get('notify_all_news', True) else 'Major only'}
+
+📈 <b>Usage Metrics</b>
+🔹 Total Users: {metrics.get('total_users', 0)}
+🔹 Total Commands: {metrics.get('total_commands', 0)}
+🔹 Active (24h): {metrics.get('active_users_24h', 0)}
 
 Use /list to see all stocks
 """
@@ -360,7 +368,20 @@ Use /list to see all stocks
             if not text.startswith('/'):
                 continue
             
-            logger.info(f"Processing command: {text}")
+            # Log user command for analytics
+            user = message.get('from', {})
+            user_id = user.get('id')
+            username = user.get('username', 'N/A')
+            first_name = user.get('first_name', 'N/A')
+            
+            # Extract command for logging
+            parts = text.strip().split(maxsplit=1)
+            cmd_name = parts[0].lower()
+            cmd_args = parts[1] if len(parts) > 1 else ''
+            
+            self.cache.log_user_command(user_id, username, first_name, cmd_name, cmd_args)
+            
+            logger.info(f"Processing command: {text} from user {username}")
             response = self.process_command(text)
             self.send_message(response)
     def start_polling(self):
