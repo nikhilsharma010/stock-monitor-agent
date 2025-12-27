@@ -257,6 +257,53 @@ class CacheDB:
             logger.error(f"Error getting user state for {user_id}: {e}")
             return {'step': 0, 'interests': '', 'risk': 'Moderate'}
 
+    # --- CONTEXT BUILDER METHODS ---
+
+    def add_context_note(self, user_id, note, category='general'):
+        """Add a note to user's investment context."""
+        try:
+            conn = sqlite3.connect(self.db_path, timeout=30)
+            cursor = conn.cursor()
+            cursor.execute(
+                'INSERT INTO user_context (user_id, note, category) VALUES (?, ?, ?)',
+                (str(user_id), note, category)
+            )
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            logger.error(f"Error adding context note for {user_id}: {e}")
+            return False
+
+    def get_user_context(self, user_id, limit=50):
+        """Fetch user's context notes."""
+        try:
+            conn = sqlite3.connect(self.db_path, timeout=30)
+            cursor = conn.cursor()
+            cursor.execute(
+                'SELECT note, timestamp, category FROM user_context WHERE user_id = ? ORDER BY timestamp DESC LIMIT ?',
+                (str(user_id), limit)
+            )
+            rows = cursor.fetchall()
+            conn.close()
+            return [{'note': r[0], 'timestamp': r[1], 'category': r[2]} for r in rows]
+        except Exception as e:
+            logger.error(f"Error fetching context for {user_id}: {e}")
+            return []
+
+    def get_context_count(self, user_id):
+        """Get total number of context notes for a user."""
+        try:
+            conn = sqlite3.connect(self.db_path, timeout=30)
+            cursor = conn.cursor()
+            cursor.execute('SELECT COUNT(*) FROM user_context WHERE user_id = ?', (str(user_id),))
+            count = cursor.fetchone()[0]
+            conn.close()
+            return count
+        except Exception as e:
+            logger.error(f"Error getting context count for {user_id}: {e}")
+            return 0
+
     # --- WATCHLIST METHODS ---
 
     def add_to_watchlist(self, user_id, ticker):
