@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from stock_monitor import StockMonitor
 from news_monitor import NewsMonitor
 from telegram_notifier import TelegramNotifier
+from bot_commands import TelegramBotHandler
 from utils import CacheDB, generate_content_hash, logger
 
 
@@ -26,7 +27,11 @@ class StockMonitorAgent:
         self.stock_monitor = StockMonitor()
         self.news_monitor = NewsMonitor()
         self.telegram = TelegramNotifier()
+        self.bot_handler = TelegramBotHandler(config_path=config_path)
         self.cache = CacheDB()
+        
+        # Store config path for reloading
+        self.config_path = config_path
         
         # Load configuration
         self.config = self._load_config(config_path)
@@ -72,7 +77,8 @@ class StockMonitorAgent:
             
             # Check if we should notify based on price change
             price_threshold = self.monitoring_config.get('price_change_threshold_percent', 5.0)
-            change_percent = abs(stock_data.get('change_percent', 0))
+            current_change = stock_data.get('change_percent')
+            change_percent = abs(current_change) if current_change is not None else 0
             
             if change_percent >= price_threshold:
                 # Generate hash for deduplication
@@ -162,6 +168,14 @@ class StockMonitorAgent:
         logger.info("="*60)
         
         try:
+            # Check for bot commands first
+            self.bot_handler.check_and_handle_commands()
+            
+            # Reload config in case it was changed by commands
+            self.config = self._load_config(self.config_path)
+            self.stocks = self.config.get('stocks', [])
+            self.monitoring_config = self.config.get('monitoring', {})
+            
             # Check stock updates
             self.check_stock_updates()
             
@@ -182,30 +196,49 @@ class StockMonitorAgent:
     
     def start_scheduled_monitoring(self):
         """Start scheduled monitoring with configured interval."""
-        interval_minutes = self.monitoring_config.get('check_interval_minutes', 15)
         
-        logger.info(f"Starting scheduled monitoring every {interval_minutes} minutes")
+        logger.info("Starting scheduled monitoring")
         logger.info(f"Monitoring stocks: {', '.join([s['ticker'] for s in self.stocks if s.get('enabled', True)])}")
         
         # Send startup notification
+        interval_minutes = self.monitoring_config.get('check_interval_minutes', 15)
         self.telegram.send_message(
             "🤖 <b>Stock Monitor Agent Started</b>\n\n"
             f"📊 Monitoring: {', '.join([s['ticker'] for s in self.stocks if s.get('enabled', True)])}\n"
             f"⏱️ Check interval: {interval_minutes} minutes\n"
             f"📰 News alerts: {'All news' if self.monitoring_config.get('notify_all_news') else 'Major news only'}\n\n"
-            "✅ Agent is now running!"
+            "✅ Agent is now running!\n\n"
+            "💡 Use /help to see bot commands"
         )
         
         # Run immediately on startup
         self.run_monitoring_cycle()
         
-        # Schedule periodic checks
+        # Schedule periodic checks - will be updated dynamically
+        schedule.clear()
+        interval_minutes = self.monitoring_config.get('check_interval_minutes', 15)
         schedule.every(interval_minutes).minutes.do(self.run_monitoring_cycle)
+        
+        logger.info(f"Scheduled checks every {interval_minutes} minutes")
         
         # Keep running
         try:
+            last_interval = interval_minutes
             while True:
                 schedule.run_pending()
+                
+                # Check if interval changed and reschedule if needed
+                current_interval = self.monitoring_config.get('check_interval_minutes', 15)
+                if current_interval != last_interval:
+                    logger.info(f"Interval changed from {last_interval} to {current_interval} minutes - rescheduling")
+                    schedule.clear()
+                    schedule.every(current_interval).minutes.do(self.run_monitoring_cycle)
+                    last_interval = current_interval
+                    self.telegram.send_message(
+                        f"⏱️ <b>Interval Updated</b>\n\n"
+                        f"Now checking every {current_interval} minutes"
+                    )
+                
                 time.sleep(30)  # Check every 30 seconds
         except KeyboardInterrupt:
             logger.info("Monitoring stopped by user")

@@ -9,6 +9,11 @@
       "ticker": "BYND",
       "name": "Beyond Meat",
       "enabled": true
+    },
+    {
+      "ticker": "NFLX",
+      "name": "NFLX",
+      "enabled": true
     }
   ],
   "monitoring": {
