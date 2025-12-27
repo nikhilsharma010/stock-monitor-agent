@@ -23,10 +23,13 @@ export default function StockDetailPage() {
         )
     }
 
-    if (error || !data) {
+    if (error || !data || data.error) {
         return (
             <div className="flex items-center justify-center min-h-screen">
-                <div className="text-red-500 text-xl">Error loading stock data</div>
+                <div className="text-center">
+                    <div className="text-red-500 text-xl mb-2">Error loading stock data</div>
+                    <div className="text-gray-400">{data?.error || 'Unknown error'}</div>
+                </div>
             </div>
         )
     }
@@ -34,6 +37,11 @@ export default function StockDetailPage() {
     const quote = data.quote || {}
     const financials = data.financials || {}
     const metrics = data.metrics || {}
+    const profile = data.profile || {}
+
+    const price = quote.current_price || 0
+    const change = quote.change || 0
+    const percentChange = quote.percent_change || 0
 
     return (
         <div className="space-y-8">
@@ -47,16 +55,14 @@ export default function StockDetailPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-4xl font-bold text-white mb-2">{ticker}</h1>
-                    <p className="text-gray-400">{quote.shortName || 'Company Name'}</p>
+                    <p className="text-gray-400">{profile.name || 'Company Name'}</p>
                 </div>
                 <div className="text-right">
                     <div className="text-3xl font-bold text-white">
-                        ${quote.regularMarketPrice?.toFixed(2) || '0.00'}
+                        ${price.toFixed(2)}
                     </div>
-                    <div className={`text-lg ${(quote.regularMarketChange || 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                        {(quote.regularMarketChange || 0) >= 0 ? '+' : ''}
-                        {quote.regularMarketChange?.toFixed(2) || '0.00'}
-                        ({(quote.regularMarketChangePercent || 0).toFixed(2)}%)
+                    <div className={`text-lg ${change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                        {change >= 0 ? '+' : ''}{change.toFixed(2)} ({percentChange.toFixed(2)}%)
                     </div>
                 </div>
             </div>
@@ -65,22 +71,22 @@ export default function StockDetailPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <StatBox
                     label="Market Cap"
-                    value={formatMarketCap(quote.marketCap)}
+                    value={financials.market_cap || 'N/A'}
                     icon={<Building className="h-5 w-5" />}
                 />
                 <StatBox
                     label="P/E Ratio"
-                    value={financials.trailingPE?.toFixed(2) || 'N/A'}
+                    value={financials.pe_ratio || 'N/A'}
                     icon={<DollarSign className="h-5 w-5" />}
                 />
                 <StatBox
                     label="52W High"
-                    value={`$${quote.fiftyTwoWeekHigh?.toFixed(2) || '0'}`}
+                    value={financials['52_week_high'] ? `$${financials['52_week_high']}` : 'N/A'}
                     icon={<TrendingUp className="h-5 w-5" />}
                 />
                 <StatBox
                     label="52W Low"
-                    value={`$${quote.fiftyTwoWeekLow?.toFixed(2) || '0'}`}
+                    value={financials['52_week_low'] ? `$${financials['52_week_low']}` : 'N/A'}
                     icon={<TrendingDown className="h-5 w-5" />}
                 />
             </div>
@@ -93,12 +99,12 @@ export default function StockDetailPage() {
                     <div className="border border-slate-800 rounded-xl bg-slate-900/50 backdrop-blur-sm p-6">
                         <h2 className="text-xl font-semibold text-white mb-4">Key Metrics</h2>
                         <div className="grid grid-cols-2 gap-4">
-                            <MetricRow label="Revenue" value={formatLargeNumber(financials.totalRevenue)} />
-                            <MetricRow label="Profit Margin" value={`${(financials.profitMargins * 100)?.toFixed(2) || '0'}%`} />
-                            <MetricRow label="EPS" value={financials.trailingEps?.toFixed(2) || 'N/A'} />
-                            <MetricRow label="Dividend Yield" value={`${(financials.dividendYield * 100)?.toFixed(2) || '0'}%`} />
-                            <MetricRow label="Beta" value={financials.beta?.toFixed(2) || 'N/A'} />
-                            <MetricRow label="Volume" value={formatLargeNumber(quote.regularMarketVolume)} />
+                            <MetricRow label="Beta" value={financials.beta || 'N/A'} />
+                            <MetricRow label="P/S Ratio" value={financials.ps_ratio || 'N/A'} />
+                            <MetricRow label="Net Margin" value={financials.net_margin ? `${financials.net_margin}%` : 'N/A'} />
+                            <MetricRow label="Operating Margin" value={financials.operating_margin ? `${financials.operating_margin}%` : 'N/A'} />
+                            <MetricRow label="Revenue Growth" value={financials.revenue_growth ? `${financials.revenue_growth}%` : 'N/A'} />
+                            <MetricRow label="EPS Growth" value={financials.eps_growth ? `${financials.eps_growth}%` : 'N/A'} />
                         </div>
                     </div>
 
@@ -107,11 +113,23 @@ export default function StockDetailPage() {
                         <div className="border border-slate-800 rounded-xl bg-slate-900/50 backdrop-blur-sm p-6">
                             <h2 className="text-xl font-semibold text-white mb-4">Performance</h2>
                             <div className="space-y-3">
-                                <PerformanceBar label="1 Week" value={metrics['1w'] || 0} />
-                                <PerformanceBar label="1 Month" value={metrics['1m'] || 0} />
-                                <PerformanceBar label="3 Months" value={metrics['3m'] || 0} />
-                                <PerformanceBar label="1 Year" value={metrics['1y'] || 0} />
+                                {metrics['5d_pct'] !== undefined && (
+                                    <PerformanceBar label="5 Days" value={metrics['5d_pct']} />
+                                )}
+                                {metrics['1m_pct'] !== undefined && (
+                                    <PerformanceBar label="1 Month" value={metrics['1m_pct']} />
+                                )}
                             </div>
+                        </div>
+                    )}
+
+                    {/* Company Description */}
+                    {profile.description && (
+                        <div className="border border-slate-800 rounded-xl bg-slate-900/50 backdrop-blur-sm p-6">
+                            <h2 className="text-xl font-semibold text-white mb-4">About</h2>
+                            <p className="text-gray-400 text-sm leading-relaxed">
+                                {profile.description.slice(0, 500)}...
+                            </p>
                         </div>
                     )}
                 </div>
@@ -137,10 +155,15 @@ export default function StockDetailPage() {
                     <div className="border border-slate-800 rounded-xl bg-slate-900/50 backdrop-blur-sm p-6">
                         <h2 className="text-xl font-semibold text-white mb-4">Company Info</h2>
                         <div className="space-y-2 text-sm">
-                            <InfoRow label="Sector" value={quote.sector || 'N/A'} />
-                            <InfoRow label="Industry" value={quote.industry || 'N/A'} />
-                            <InfoRow label="Exchange" value={quote.exchange || 'N/A'} />
-                            <InfoRow label="Currency" value={quote.currency || 'USD'} />
+                            <InfoRow label="Sector" value={profile.sector || 'N/A'} />
+                            <InfoRow label="Industry" value={profile.finnhubIndustry || 'N/A'} />
+                            {profile.website && (
+                                <div className="pt-2">
+                                    <a href={profile.website} target="_blank" rel="noopener noreferrer" className="text-indigo-500 hover:text-indigo-400">
+                                        Visit Website →
+                                    </a>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -199,19 +222,4 @@ function InfoRow({ label, value }: any) {
             <span className="text-white">{value}</span>
         </div>
     )
-}
-
-function formatMarketCap(value: number) {
-    if (!value) return 'N/A'
-    if (value >= 1e12) return `$${(value / 1e12).toFixed(2)}T`
-    if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`
-    if (value >= 1e6) return `$${(value / 1e6).toFixed(2)}M`
-    return `$${value.toLocaleString()}`
-}
-
-function formatLargeNumber(value: number) {
-    if (!value) return 'N/A'
-    if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`
-    if (value >= 1e6) return `$${(value / 1e6).toFixed(2)}M`
-    return `$${value.toLocaleString()}`
 }
