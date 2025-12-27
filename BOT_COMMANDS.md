@@ -86,16 +86,9 @@ Now you'll get updates every minute!
 /list
 ```
 
-## Important Notes
+## ✨ Live Updates
 
-⚠️ **After changing stocks or interval, you need to restart the agent** for changes to take effect:
-
-```bash
-# Stop the current agent (Ctrl+C in terminal)
-# Then restart:
-cd /Users/nikhil/.gemini/antigravity/scratch/stock-monitor-agent
-python3 src/main.py
-```
+The agent now supports **Live Configuration Updates**. Changes you make via Telegram commands (like adding a stock or changing the interval) take effect **immediately** without needing to restart the bot! 🚀
 
 ## Current Configuration
 

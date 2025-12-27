@@ -133,5 +133,5 @@ class StockAnalyzer:
             return response.text
             
         except Exception as e:
-            logger.error(f"Error generating AI commentary for {ticker}: {e}")
-            return "⚠️ Failed to generate AI commentary."
+            logger.error(f"Error generating AI commentary for {ticker}: {str(e)}")
+            return f"⚠️ Failed to generate AI commentary: {str(e)}"
