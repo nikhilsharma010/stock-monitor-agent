@@ -176,21 +176,16 @@ class TelegramBotHandler:
     def handle_help(self):
         """Show help message."""
         return """
-🤖 <b>Stock Monitor Bot Commands</b>
+🤖 <b>Stock Monitor Bot</b>
 
-<b>Stock Management:</b>
-/add TICKER - Add stock to monitor
-/remove TICKER - Remove stock from monitoring
-/list - Show all monitored stocks
-/interval MINUTES - Set check interval
-
-<b>AI Analysis:</b>
-/analyse TICKER - Get fundamental analysis & Buy/Hold/Sell rating
-/ask TICKER QUESTION - Ask AI anything about a company
-
-<b>Status:</b>
-/status - Show current status
-/help - Show this message
+<b>Commands:</b>
+• /add TICKER - Track a stock
+• /remove TICKER - Stop tracking
+• /list - Show monitored stocks
+• /analyse TICKER - AI Analysis & Rating
+• /ask TICKER QUESTION - Ask AI anything
+• /status - Show agent status
+• /interval MIN - Set check interval
 """
     
     def handle_status(self):

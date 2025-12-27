@@ -201,14 +201,11 @@ class StockMonitorAgent:
         logger.info(f"Monitoring stocks: {', '.join([s['ticker'] for s in self.stocks if s.get('enabled', True)])}")
         
         # Send startup notification
-        interval_minutes = self.monitoring_config.get('check_interval_minutes', 15)
+        active_tickers = [s['ticker'] for s in self.stocks if s.get('enabled', True)]
         self.telegram.send_message(
-            "🤖 <b>Stock Monitor Agent Started</b>\n\n"
-            f"📊 Monitoring: {', '.join([s['ticker'] for s in self.stocks if s.get('enabled', True)])}\n"
-            f"⏱️ Check interval: {interval_minutes} minutes\n"
-            f"📰 News alerts: {'All news' if self.monitoring_config.get('notify_all_news') else 'Major news only'}\n\n"
-            "✅ Agent is now running!\n\n"
-            "💡 Use /help to see bot commands"
+            "🚀 <b>Stock Monitor is LIVE!</b>\n\n"
+            f"Currently tracking: {', '.join(active_tickers)}\n"
+            "Use /help to see all commands."
         )
         
         # Run immediately on startup
