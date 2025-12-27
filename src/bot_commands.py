@@ -215,27 +215,33 @@ Use /list to see all stocks
         ticker = ticker.upper().strip()
         self.send_message(f"🔍 <b>Analyzing {ticker}...</b>\nFetching financials and AI commentary. This may take a moment.")
         
-        metrics = self.analyzer.get_basic_financials(ticker)
-        history = self.analyzer.get_price_history(ticker)
-        
-        if not metrics or not history:
-            return f"❌ Failed to fetch data for {ticker}. Please verify the ticker."
-        
-        # Get AI commentary
-        commentary = self.analyzer.get_ai_commentary(ticker, metrics, history)
-        
-        # Format metrics summary
-        summary = (
-            f"📊 <b>Fundamental Data: {ticker}</b>\n\n"
-            f"💰 P/E Ratio: {metrics['pe_ratio'] or 'N/A'}\n"
-            f"🏦 Market Cap: {metrics['market_cap'] or 'N/A'}M\n"
-            f"📏 P/S Ratio: {metrics['ps_ratio'] or 'N/A'}\n"
-            f"📈 52W High: ${metrics['52_week_high'] or 'N/A'}\n"
-            f"📉 52W Low: ${metrics['52_week_low'] or 'N/A'}\n"
-            f"🎲 Beta: {metrics['beta'] or 'N/A'}\n\n"
-            f"<b>🧠 AI Analysis:</b>\n{commentary}"
-        )
-        return summary
+        try:
+            metrics = self.analyzer.get_basic_financials(ticker)
+            if not metrics:
+                return f"❌ Failed to fetch financial metrics for {ticker}. The symbol might be incorrect or API limit reached."
+            
+            history = self.analyzer.get_price_history(ticker)
+            if not history:
+                return f"❌ Failed to fetch price history for {ticker}. (Financial metrics were retrieved: P/E {metrics['pe_ratio']})"
+
+            # Get AI commentary
+            commentary = self.analyzer.get_ai_commentary(ticker, metrics, history)
+            
+            # Format metrics summary
+            summary = (
+                f"📊 <b>Fundamental Data: {ticker}</b>\n\n"
+                f"💰 P/E Ratio: {metrics['pe_ratio'] or 'N/A'}\n"
+                f"🏦 Market Cap: {metrics['market_cap'] or 'N/A'}M\n"
+                f"📏 P/S Ratio: {metrics['ps_ratio'] or 'N/A'}\n"
+                f"📈 52W High: ${metrics['52_week_high'] or 'N/A'}\n"
+                f"📉 52W Low: ${metrics['52_week_low'] or 'N/A'}\n"
+                f"🎲 Beta: {metrics['beta'] or 'N/A'}\n\n"
+                f"<b>🧠 AI Analysis:</b>\n{commentary}"
+            )
+            return summary
+        except Exception as e:
+            logger.error(f"Crash in handle_analyse: {e}", exc_info=True)
+            return f"❌ An internal error occurred during analysis: {str(e)}"
 
     def handle_ask(self, parts_text):
         """Handle user questions about a stock."""
