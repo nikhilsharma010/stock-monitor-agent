@@ -13,11 +13,11 @@ export default function Home() {
               <span className="text-xl font-bold text-white">Alpha Intelligence</span>
             </div>
             <div className="flex items-center space-x-4">
-              <Link href="/login" className="text-gray-300 hover:text-white transition">
-                Login
+              <Link href="/sign-in" className="text-gray-300 hover:text-white transition">
+                Sign In
               </Link>
-              <Link href="/signup" className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition">
-                Start Free Trial
+              <Link href="/sign-up" className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition">
+                Sign Up
               </Link>
             </div>
           </div>
@@ -37,7 +37,7 @@ export default function Home() {
             Build investment theses. Track financial goals. Make smarter decisions with AI-powered insights for both US and Indian markets.
           </p>
           <div className="flex justify-center space-x-4">
-            <Link href="/signup" className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-lg font-semibold flex items-center space-x-2 transition">
+            <Link href="/sign-up" className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-lg font-semibold flex items-center space-x-2 transition">
               <span>Get Started Free</span>
               <ArrowRight className="h-5 w-5" />
             </Link>
@@ -88,7 +88,7 @@ export default function Home() {
           <p className="text-indigo-100 mb-8 text-lg">
             Join thousands of investors making smarter decisions with Alpha Intelligence.
           </p>
-          <Link href="/signup" className="bg-white text-indigo-600 hover:bg-gray-100 px-8 py-4 rounded-lg font-semibold inline-flex items-center space-x-2 transition">
+          <Link href="/sign-up" className="bg-white text-indigo-600 hover:bg-gray-100 px-8 py-4 rounded-lg font-semibold inline-flex items-center space-x-2 transition">
             <span>Start Your Free Trial</span>
             <ArrowRight className="h-5 w-5" />
           </Link>
