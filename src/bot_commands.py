@@ -13,6 +13,8 @@ from analyzer import StockAnalyzer
 class TelegramBotHandler:
     """Handles incoming Telegram commands for managing stocks and settings."""
     
+    FINANCIAL_DISCLAIMER = "\n\n⚠️ <b>Disclaimer</b>: <i>This report is AI-generated for informational purposes only. Not financial advice. Always consult a certified professional before trading.</i>"
+
     def __init__(self, bot_token=None, chat_id=None, config_path='config/stocks.json', cache=None, notifier=None):
         self.bot_token = bot_token or os.getenv('TELEGRAM_BOT_TOKEN')
         self.chat_id = chat_id or os.getenv('TELEGRAM_CHAT_ID')
@@ -257,8 +259,11 @@ This platform is free and open-source, but running the AI models and infrastruct
             # 5. Fetch Performance Metrics (New for 5.1)
             performance = self.analyzer.get_performance_metrics(ticker)
             
-            # 6. Get AI Deep Commentary
-            commentary = self.analyzer.get_ai_commentary(ticker, metrics, quote, news=news, profile=profile, performance=performance)
+            # 6. Fetch Alpha Intel (New for 8.0)
+            alpha_intel = self.analyzer.get_alpha_intelligence(ticker)
+            
+            # 7. Get AI Deep Commentary
+            commentary = self.analyzer.get_ai_commentary(ticker, metrics, quote, news=news, profile=profile, performance=performance, alpha_intel=alpha_intel)
             
             # Format report
             name = profile.get('name', ticker)
@@ -314,8 +319,16 @@ This platform is free and open-source, but running the AI models and infrastruct
                 f"Rev. Growth:    {metrics['revenue_growth']}%\n"
                 f"ROIC:           {metrics['roic']}%"
                 f"</code>\n\n"
+                f"🐋 <b>BIG MONEY FOOTPRINT</b>\n"
+                f"<code>"
+                f"Inst. Held:     {alpha_intel['inst_held']}\n"
+                f"Insider Held:   {alpha_intel['insider_held']}\n"
+                f"Short Interest: {metrics['short_pct']}%\n"
+                f"Short Ratio:    {metrics['short_ratio']}"
+                f"</code>\n\n"
                 f"🧠 <b>UNIFIED INTELLIGENCE</b>\n"
-                f"{commentary}\n"
+                f"{commentary}"
+                f"{self.FINANCIAL_DISCLAIMER}\n"
                 f"────────────────────────"
             )
             report += f"\n\n<b>🗓 EARNINGS PROXIMITY</b>\nNext Earnings: <code>{metrics.get('next_earnings')}</code> ({metrics.get('days_to_earnings')} days)"
@@ -351,8 +364,10 @@ This platform is free and open-source, but running the AI models and infrastruct
             quote = self.analyzer.get_stock_quote(ticker)
             profile = self.analyzer.get_company_profile(ticker)
             
-            answer = self.analyzer.get_ai_commentary(ticker, metrics, quote, question=question, profile=profile)
-            return f"🤖 <b>AI Answer for {ticker}:</b>\n\n{answer}"
+            alpha = self.analyzer.get_alpha_intelligence(ticker)
+            
+            answer = self.analyzer.get_ai_commentary(ticker, metrics, quote, question=question, profile=profile, alpha_intel=alpha)
+            return f"🤖 <b>AI Answer for {ticker}:</b>\n\n{answer}{self.FINANCIAL_DISCLAIMER}"
         except Exception as e:
             logger.error(f"Error in handle_ask: {e}", exc_info=True)
             return f"❌ Failed to get AI answer: {str(e)}"

@@ -97,7 +97,9 @@ class StockAnalyzer:
                 'eps_growth': fmt(info.get('earningsGrowth'), 100),
                 'roic': fmt(info.get('returnOnAssets'), 100), # Using ROA as high-confidence proxy
                 'debt_to_equity': fmt(info.get('debtToEquity')),
-                'volume_avg_10d': fmt(info.get('averageVolume10days'))
+                'volume_avg_10d': fmt(info.get('averageVolume10days')),
+                'short_pct': fmt(info.get('shortPercentOfFloat'), 100),
+                'short_ratio': fmt(info.get('shortRatio'))
             })
             
             # Add Earnings proximity
@@ -189,7 +191,7 @@ class StockAnalyzer:
             logger.error(f"Error fetching yfinance quote for {ticker}: {e}")
             return None
 
-    def get_ai_commentary(self, ticker, metrics, quote, news=None, question=None, profile=None, performance=None):
+    def get_ai_commentary(self, ticker, metrics, quote, news=None, question=None, profile=None, performance=None, alpha_intel=None):
         """Generate Deep AI commentary using Groq."""
         # Dynamic re-check for key if missing
         if not self.client:
@@ -234,13 +236,26 @@ class StockAnalyzer:
                 headlines = [n['headline'] for n in news[:10]]
                 news_context = "\nRecent 60-Day News Headlines:\n" + "\n".join([f"- {h}" for h in headlines])
 
+            intel_context = ""
+            if alpha_intel:
+                intel_context = (
+                    f"\nBIG MONEY INTEL:\n"
+                    f"- Institutional Held: {alpha_intel['insider_held']}\n"
+                    f"- Institutional Held: {alpha_intel['inst_held']}\n"
+                    f"- Top Holders: {', '.join(alpha_intel['top_holders'])}\n"
+                    f"- Short % of Float: {metrics.get('short_pct', 'N/A')}\n"
+                )
+                if alpha_intel['recent_insider_trades']:
+                    trades = [f"{t['type']} ({t['shares']} shares) on {t['date']}" for t in alpha_intel['recent_insider_trades']]
+                    intel_context += f"- Recent Insider Trades: {'; '.join(trades)}\n"
+
             if question:
                 system_prompt = (
                     f"You are a Senior Equity Analyst. Industry: {industry}. "
                     "Use a First-Principles approach: Break everything down to logical drivers. "
                     "Always use bullet points. Keep answers objective and grounded."
                 )
-                user_prompt = f"Stock: {ticker}\nMetrics: {metrics_str}\n{price_context}\n{news_context}\n\nQuestion: {question}"
+                user_prompt = f"Stock: {ticker}\nMetrics: {metrics_str}\n{price_context}\n{news_context}\n{intel_context}\n\nQuestion: {question}"
             else:
                 system_prompt = (
                     f"You are a Senior Strategic Advisor. Industry: {industry}.\n"
@@ -252,13 +267,13 @@ class StockAnalyzer:
                     "4. OPERATOR UX: Be direct. Max 200 words."
                 )
                 user_prompt = (
-                    f"Perform a 'Deep Intelligence' report for {ticker} over the last 60 days.\n\n"
-                    f"Data: {metrics_str}\n{price_context}\n{news_context}\n\n"
+                    f"Perform a 'Deep Intelligence' report for {ticker}.\n\n"
+                    f"Data: {metrics_str}\n{price_context}\n{news_context}\n{intel_context}\n\n"
                     "FORMATTING SPECIFICATION:\n"
                     "• 🔍 <b>THE NARRATIVE</b>: 1-line summary of the core market story.\n"
                     "• 📈 <b>BULL CASE</b>: 2 bullets on positive catalysts/upside drivers.\n"
-                    "• 📉 <b>BEAR CASE</b>: 2 bullets on critical red flags/risks (<i>skepticism</i>).\n"
-                    "• 🏭 <b>INDUSTRY CONTEXT</b>: 1-2 bullets on sector-wide impacts.\n"
+                    "• 📉 <b>BEAR CASE</b>: 2 bullets on critical red flags/risks.\n"
+                    "• 🐋 <b>BIG MONEY</b>: Interpretation of institutional/insider activity.\n"
                     "• ⭐ <b>STRATEGIC STANCE</b>: ⭐ ⭐ ⭐ <b>BUY/HOLD/SELL</b> - <i>1-sentence tactical logic.</i>"
                 )
 
@@ -509,3 +524,52 @@ FORMAT:
         except Exception as e:
             logger.error(f"Error checking volume anomaly: {e}")
             return None
+
+    def get_alpha_intelligence(self, ticker):
+        """Fetch Big Money footprint (Insider & Institutional)."""
+        intel = {
+            'insider_held': 'N/A',
+            'inst_held': 'N/A',
+            'top_holders': [],
+            'recent_insider_trades': []
+        }
+        try:
+            symbol = yf.Ticker(ticker)
+            
+            # 1. Ownership Percentages
+            major_holders = symbol.major_holders
+            if not major_holders is None and not major_holders.empty:
+                if 'Value' in major_holders.columns:
+                    if 'insidersPercentHeld' in major_holders.index:
+                        val = major_holders.loc['insidersPercentHeld', 'Value']
+                        if pd.notnull(val):
+                            intel['insider_held'] = f"{val * 100:.1f}%"
+                    if 'institutionsPercentHeld' in major_holders.index:
+                        val = major_holders.loc['institutionsPercentHeld', 'Value']
+                        if pd.notnull(val):
+                            intel['inst_held'] = f"{val * 100:.1f}%"
+
+            # 2. Top Institutional Holders
+            inst_holders = symbol.institutional_holders
+            if not inst_holders is None and not inst_holders.empty:
+                # Columns: Holder, Shares, Date Reported, % Out, Value
+                for _, row in inst_holders.head(3).iterrows():
+                    intel['top_holders'].append(f"{row['Holder'][:15]} ({row['pctChange'] * 100:+.1f}%)")
+
+            # 3. Recent Insider Transactions
+            insider = symbol.insider_transactions
+            if not insider is None and not insider.empty:
+                # Filter for non-zero values and recent dates if possible
+                # Columns: Shares, Value, Text, Transaction, Start Date
+                for _, row in insider.head(3).iterrows():
+                    text = row['Text'] if pd.notnull(row['Text']) else "Trade"
+                    intel['recent_insider_trades'].append({
+                        'date': str(row['Start Date']),
+                        'type': text,
+                        'shares': row['Shares']
+                    })
+
+            return intel
+        except Exception as e:
+            logger.error(f"Error fetching alpha intel for {ticker}: {e}")
+            return intel
