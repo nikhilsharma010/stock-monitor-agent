@@ -168,9 +168,6 @@ class StockMonitorAgent:
         logger.info("="*60)
         
         try:
-            # Check for bot commands first
-            self.bot_handler.check_and_handle_commands()
-            
             # Reload config in case it was changed by commands
             self.config = self._load_config(self.config_path)
             self.stocks = self.config.get('stocks', [])
@@ -224,6 +221,9 @@ class StockMonitorAgent:
             while True:
                 schedule.run_pending()
                 
+                # Check for bot commands frequently (between monitoring cycles)
+                self.bot_handler.check_and_handle_commands()
+                
                 # Check if interval changed and reschedule if needed
                 current_interval = self.monitoring_config.get('check_interval_minutes', 15)
                 if current_interval != last_interval:
@@ -236,7 +236,7 @@ class StockMonitorAgent:
                         f"Now checking every {current_interval} minutes"
                     )
                 
-                time.sleep(30)  # Check every 30 seconds
+                time.sleep(10)  # Check for commands/pending tasks every 10 seconds
         except KeyboardInterrupt:
             logger.info("Monitoring stopped by user")
             self.telegram.send_message(
