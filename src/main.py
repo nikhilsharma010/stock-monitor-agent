@@ -1,5 +1,6 @@
 """
-Main orchestrator for the stock monitoring agent.
+Main orchestrator for the# Stock Monitoring Agent - Deployment Trigger: Groq & Responsiveness Update
+.
 Coordinates stock monitoring, news fetching, and Telegram notifications.
 """
 import os
