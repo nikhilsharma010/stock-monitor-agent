@@ -170,6 +170,7 @@ class TelegramBotHandler:
 ────────────────────────
 <b>📊 MARKET CONTEXT</b>
 • /snapshot TICKER - Multi-timeframe deep report (Alias: /analyse)
+• /chart TICKER - Technical analysis chart (DMA + RSI)
 • /why TICKER - Instant narrative: why it moved
 • /compare T1 T2 - Side-by-side strategic analysis
 • /ask <code>SYM Q</code> - Financial Q&A
@@ -342,6 +343,35 @@ This platform is free and open-source, but running the AI models and infrastruct
             return f"❌ Failed to get AI answer: {str(e)}"
     
     
+    def handle_chart(self, args, chat_id):
+        """Generate and send technical chart."""
+        if not args:
+            return "❌ Usage: /chart TICKER\nExample: /chart NVDA"
+        
+        ticker = args.upper().strip()
+        self.send_message(f"📊 <b>Generating technical chart for {ticker}...</b>", chat_id=chat_id)
+        
+        try:
+            chart_buf = self.analyzer.get_stock_chart(ticker)
+            if not chart_buf:
+                return f"❌ Failed to generate chart for {ticker}. Symbol might be invalid or data unavailable."
+            
+            # Use notifier.send_photo
+            success = self.notifier.send_photo(
+                chart_buf, 
+                caption=f"📈 <b>Technical Analysis: {ticker}</b>\n• SMAs: 20(Green), 50(Orange), 200(Red)\n• RSI(14) in purple",
+                chat_id=chat_id
+            )
+            
+            if not success:
+                return "❌ Failed to send chart image. Please try again."
+            
+            return None # Message sent via send_photo
+            
+        except Exception as e:
+            logger.error(f"Error in handle_chart for {ticker}: {e}", exc_info=True)
+            return f"❌ Error: {str(e)}"
+
     def handle_compare(self, args, chat_id):
         """Compare two stock tickers."""
         tickers = args.upper().strip().split()
@@ -450,6 +480,8 @@ This platform is free and open-source, but running the AI models and infrastruct
                     cmd_name = command[1:]
                     return f"❌ Usage: /{cmd_name} TICKER\nExample: /{cmd_name} AAPL"
                 return self.handle_analyse(args, chat_id)
+            elif command == '/chart':
+                return self.handle_chart(args, chat_id)
             elif command == '/ask':
                 if not args:
                     return "❌ Usage: /ask TICKER QUESTION\nExample: /ask CCCC What does this company do?"

@@ -110,6 +110,38 @@ class TelegramNotifier:
         
         return self.send_message(message, chat_id=chat_id)
     
+    def send_photo(self, photo_bytes, caption=None, chat_id=None):
+        """
+        Send a photo via Telegram.
+        
+        Args:
+            photo_bytes: Bytes object or file-like object containing the image
+            caption: Optional caption for the photo
+            chat_id: Optional recipient chat ID
+        """
+        target_chat_id = chat_id or self.chat_id
+        if not target_chat_id:
+            logger.error("No chat_id provided for send_photo.")
+            return False
+
+        try:
+            url = f"{self.api_url}/sendPhoto"
+            files = {'photo': ('chart.png', photo_bytes, 'image/png')}
+            data = {'chat_id': target_chat_id}
+            if caption:
+                data['caption'] = caption
+                data['parse_mode'] = 'HTML'
+                
+            response = requests.post(url, data=data, files=files, timeout=20)
+            response.raise_for_status()
+            
+            logger.info("Photo sent successfully via Telegram")
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to send Telegram photo: {e}")
+            return False
+    
     def test_connection(self):
         """Test the Telegram bot connection."""
         try:

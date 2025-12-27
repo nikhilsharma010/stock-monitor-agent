@@ -6,6 +6,10 @@ import requests
 import logging
 import time
 from datetime import datetime, timedelta
+import io
+import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 from groq import Groq
 from utils import logger
 
@@ -322,3 +326,92 @@ FORMAT:
         except Exception as e:
             logger.error(f"Error in AI comparison: {e}")
             return f"⚠️ AI Comparison failed: {str(e)}"
+
+    def get_stock_chart(self, ticker, days=180):
+        """Generate a technical chart with DMA and RSI overlays."""
+        try:
+            # 1. Fetch historical candles
+            end = int(time.time())
+            start = end - (days * 24 * 60 * 60)
+            
+            url = f"{self.finnhub_base_url}/stock/candle"
+            params = {
+                'symbol': ticker,
+                'resolution': 'D',
+                'from': start,
+                'to': end,
+                'token': self.finnhub_api_key
+            }
+            
+            response = requests.get(url, params=params, timeout=10)
+            data = response.json()
+            
+            if data.get('s') != 'ok':
+                logger.error(f"Failed to fetch candles for {ticker}: {data.get('s')}")
+                return None
+            
+            # 2. Prepare Dataframe
+            df = pd.DataFrame({
+                'Date': pd.to_datetime(data['t'], unit='s'),
+                'Close': data['c'],
+                'Open': data['o'],
+                'High': data['h'],
+                'Low': data['l'],
+                'Volume': data['v']
+            })
+            df.set_index('Date', inplace=True)
+            
+            # 3. Calculate Indicators
+            df['DMA20'] = df['Close'].rolling(window=20).mean()
+            df['DMA50'] = df['Close'].rolling(window=50).mean()
+            df['DMA200'] = df['Close'].rolling(window=200).mean()
+            
+            # RSI Calculation
+            delta = df['Close'].diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+            rs = gain / loss
+            df['RSI'] = 100 - (100 / (1 + rs))
+            
+            # 4. Plotting (Dark Mode / Professional Aesthetic)
+            plt.style.use('dark_background')
+            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8), gridspec_kw={'height_ratios': [3, 1]}, sharex=True)
+            fig.subplots_adjust(hspace=0.05)
+            
+            # Subplot 1: Price and DMAs
+            ax1.plot(df.index, df['Close'], color='#1f77b4', label='Close Price', linewidth=1.5, alpha=0.8)
+            ax1.plot(df.index, df['DMA20'], color='#2ca02c', label='20-Day SMA', linewidth=1, alpha=0.9)
+            ax1.plot(df.index, df['DMA50'], color='#ff7f0e', label='50-Day SMA', linewidth=1, alpha=0.9)
+            if not df['DMA200'].isnull().all():
+                ax1.plot(df.index, df['DMA200'], color='#d62728', label='200-Day SMA', linewidth=1, alpha=0.9)
+            
+            ax1.set_title(f"Technical Analysis: {ticker}", fontsize=16, fontweight='bold', pad=20)
+            ax1.set_ylabel("Price (USD)", fontsize=12)
+            ax1.legend(loc='best', frameon=False)
+            ax1.grid(True, alpha=0.2)
+            
+            # Subplot 2: RSI
+            ax2.plot(df.index, df['RSI'], color='#9467bd', label='RSI (14)', linewidth=1.2)
+            ax2.axhline(70, color='red', linestyle='--', alpha=0.5, linewidth=0.8)
+            ax2.axhline(30, color='green', linestyle='--', alpha=0.5, linewidth=0.8)
+            ax2.fill_between(df.index, 30, 70, color='#9467bd', alpha=0.1)
+            ax2.set_ylabel("RSI", fontsize=12)
+            ax2.set_ylim(0, 100)
+            ax2.grid(True, alpha=0.2)
+            
+            # Formatting Date Axis
+            ax2.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
+            fig.autofmt_xdate()
+            
+            # 5. Export to Buffer
+            buf = io.BytesIO()
+            plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+            buf.seek(0)
+            plt.close(fig)
+            
+            return buf
+            
+        except Exception as e:
+            logger.error(f"Error generating chart for {ticker}: {e}")
+            plt.close('all')
+            return None

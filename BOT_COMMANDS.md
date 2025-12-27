@@ -39,13 +39,20 @@ Example: `/compare AAPL MSFT`
 
 ---
 
-### 🧠 60-Day Deep Intelligence
-**Advanced Analysis:**
+### 🧠 Unified Intelligence & Visuals
+
+**Deep Analysis:**
 ```
-/analyse TICKER
+/snapshot TICKER
 ```
-Example: `/analyse TSLA`
-*AI studies the last **60 days** of news, sector trends, and narratives to give you a strategic rating.*
+*Alias: `/analyse` or `/why`*
+*AI performs a 'Unified Intelligence' report: balanced Bull/Bear cases, narrative decoding, and tactical verdicts.*
+
+**Technical Charts:**
+```
+/chart TICKER
+```
+*Generates a professional dark-mode chart with 20/50/200-day Moving Averages (DMA) and RSI indicators.*
 
 **Ask the AI Expert:**
 ```
