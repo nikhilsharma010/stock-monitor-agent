@@ -17,6 +17,10 @@ class StockAnalyzer:
         self.groq_api_key = groq_api_key or os.getenv('GROQ_API_KEY') or os.getenv('GROQ_KEY')
         self.finnhub_base_url = "https://finnhub.io/api/v1"
         
+        # Super-debug: Log all env keys
+        all_keys = list(os.environ.keys())
+        logger.debug(f"StockAnalyzer Init: All Env Keys: {all_keys}")
+        
         if self.groq_api_key:
             self.client = Groq(api_key=self.groq_api_key)
             self.model = "llama-3.1-70b-versatile"

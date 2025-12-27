@@ -5,6 +5,7 @@ import os
 import json
 import time
 import requests
+from datetime import datetime
 from utils import logger
 from analyzer import StockAnalyzer
 
@@ -281,42 +282,46 @@ Use /list to see all stocks
     
     def process_command(self, message_text):
         """Process a command message."""
-        parts = message_text.strip().split(maxsplit=1)
-        command = parts[0].lower()
-        args = parts[1] if len(parts) > 1 else ''
-        
-        if command == '/start':
-            return self.handle_help()
-        elif command == '/help':
-            return self.handle_help()
-        elif command == '/add':
-            if not args:
-                return "❌ Usage: /add TICKER\nExample: /add AAPL"
-            return self.handle_add_stock(args)
-        elif command == '/remove':
-            if not args:
-                return "❌ Usage: /remove TICKER\nExample: /remove BYND"
-            return self.handle_remove_stock(args)
-        elif command == '/list':
-            return self.handle_list_stocks()
-        elif command == '/interval':
-            if not args:
-                return "❌ Usage: /interval MINUTES\nExample: /interval 5"
-            return self.handle_set_interval(args)
-        elif command == '/status':
-            return self.handle_status()
-        elif command == '/analyse' or command == '/analyze':
-            if not args:
-                return "❌ Usage: /analyse TICKER\nExample: /analyse AAPL"
-            return self.handle_analyse(args)
-        elif command == '/ask':
-            if not args:
-                return "❌ Usage: /ask TICKER QUESTION\nExample: /ask CCCC What does this company do?"
-            return self.handle_ask(args)
-        elif command == '/debug':
-            return self.handle_debug()
-        else:
-            return f"❌ Unknown command: {command}\n\nUse /help to see available commands"
+        try:
+            parts = message_text.strip().split(maxsplit=1)
+            command = parts[0].lower()
+            args = parts[1] if len(parts) > 1 else ''
+            
+            if command == '/start':
+                return self.handle_help()
+            elif command == '/help':
+                return self.handle_help()
+            elif command == '/add':
+                if not args:
+                    return "❌ Usage: /add TICKER\nExample: /add AAPL"
+                return self.handle_add_stock(args)
+            elif command == '/remove':
+                if not args:
+                    return "❌ Usage: /remove TICKER\nExample: /remove BYND"
+                return self.handle_remove_stock(args)
+            elif command == '/list':
+                return self.handle_list_stocks()
+            elif command == '/interval':
+                if not args:
+                    return "❌ Usage: /interval MINUTES\nExample: /interval 5"
+                return self.handle_set_interval(args)
+            elif command == '/status':
+                return self.handle_status()
+            elif command == '/analyse' or command == '/analyze':
+                if not args:
+                    return "❌ Usage: /analyse TICKER\nExample: /analyse AAPL"
+                return self.handle_analyse(args)
+            elif command == '/ask':
+                if not args:
+                    return "❌ Usage: /ask TICKER QUESTION\nExample: /ask CCCC What does this company do?"
+                return self.handle_ask(args)
+            elif command == '/debug':
+                return self.handle_debug()
+            else:
+                return f"❌ Unknown command: {command}\n\nUse /help to see available commands"
+        except Exception as e:
+            logger.error(f"Error processing command {message_text}: {e}", exc_info=True)
+            return f"❌ An internal error occurred while processing your command: {str(e)}"
     
     def check_and_handle_commands(self):
         """Check for new commands and handle them."""
