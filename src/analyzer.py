@@ -14,7 +14,7 @@ class StockAnalyzer:
     
     def __init__(self, finnhub_api_key=None, groq_api_key=None):
         self.finnhub_api_key = finnhub_api_key or os.getenv('FINNHUB_API_KEY')
-        self.groq_api_key = groq_api_key or os.getenv('GROQ_API_KEY')
+        self.groq_api_key = groq_api_key or os.getenv('GROQ_API_KEY') or os.getenv('GROQ_KEY')
         self.finnhub_base_url = "https://finnhub.io/api/v1"
         
         if self.groq_api_key:
@@ -86,7 +86,7 @@ class StockAnalyzer:
         """Generate AI commentary using Groq."""
         # Dynamic re-check for key if missing (helps with live env var updates)
         if not self.client:
-            self.groq_api_key = os.getenv('GROQ_API_KEY')
+            self.groq_api_key = os.getenv('GROQ_API_KEY') or os.getenv('GROQ_KEY')
             if self.groq_api_key:
                 try:
                     self.client = Groq(api_key=self.groq_api_key)

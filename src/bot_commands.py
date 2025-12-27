@@ -187,6 +187,7 @@ class TelegramBotHandler:
 • /ask TICKER QUESTION - Ask AI anything
 • /status - Show agent status
 • /interval MIN - Set check interval
+• /debug - Check API key status
 """
     
     def handle_status(self):
@@ -262,6 +263,20 @@ Use /list to see all stocks
         answer = self.analyzer.get_ai_commentary(ticker, metrics, quote, question=question)
         return f"🤖 <b>AI Answer for {ticker}:</b>\n\n{answer}"
     
+    def handle_debug(self):
+        """Show diagnostic information."""
+        vars_to_check = ['FINNHUB_API_KEY', 'TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID', 'GROQ_API_KEY', 'GROQ_KEY']
+        lines = ["🔎 <b>System Debug Information</b>\n"]
+        
+        for var in vars_to_check:
+            val = os.getenv(var)
+            status = "✅ Found" if val else "❌ Missing"
+            masked = f"{val[:5]}...{val[-4:]}" if val and len(val) > 10 else "N/A"
+            lines.append(f"• {var}: {status} ({masked})")
+            
+        lines.append(f"\nModel Initialized: {'✅ Yes' if self.analyzer.client else '❌ No'}")
+        return "\n".join(lines)
+    
     def process_command(self, message_text):
         """Process a command message."""
         parts = message_text.strip().split(maxsplit=1)
@@ -296,6 +311,8 @@ Use /list to see all stocks
             if not args:
                 return "❌ Usage: /ask TICKER QUESTION\nExample: /ask CCCC What does this company do?"
             return self.handle_ask(args)
+        elif command == '/debug':
+            return self.handle_debug()
         else:
             return f"❌ Unknown command: {command}\n\nUse /help to see available commands"
     
