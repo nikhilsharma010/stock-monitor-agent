@@ -300,19 +300,20 @@ class StockAnalyzer:
             industry = profile.get('finnhubIndustry', 'N/A') if profile else "N/A"
 
             system_prompt = (
-                f"You are a Market Strategist. Analyze {ticker} ({industry}).\n"
-                "TASK: Identify the single most likely driver for 1D or 5D performance.\n"
-                "RULES: 1. Max 80 words. 2. No filler. 3. Be direct. 4. Bullet points only."
+                f"You are a World-Class Market Strategist. Analyze {ticker} ({industry}).\n"
+                "TASK: Decode the narrative behind recent moves (1D to 30D).\n"
+                "RULES: 1. Max 120 words. 2. Balanced view: Must show BOTH Bull and Bear factors. 3. Be direct."
             )
             user_prompt = (
                 f"TICKER: {ticker}\n"
-                f"1D MOVE: {chg:+.2f}%\n"
-                f"5D MOVE: {p5d_str}\n"
-                f"RECENT NEWS:\n{news_str}\n\n"
-                "Provide 'The Move' analysis in this format:\n"
-                "🔍 <b>THE MOVE</b>: [1-line narrative]\n"
-                "⚙️ <b>PRIMARY DRIVERS</b>:\n• [Bullet 1]\n• [Bullet 2]\n"
-                "🎯 <b>WHAT TO WATCH</b>:\n• [1-line next level]"
+                f"RETURNS: 1D({chg:+.2f}%), 5D({p5d_str}), 1M({p1m_str})\n"
+                f"NEWS/CONTEXT:\n{news_str}\n\n"
+                "If news is thin, interpret price action vs. industry cycles or structural milestones (e.g. trials).\n\n"
+                "FORMAT:\n"
+                "🔍 <b>THE NARRATIVE</b>: [1-line summary]\n"
+                "📈 <b>BULL CASE</b>: [1 bullet on positive drivers]\n"
+                "📉 <b>BEAR CASE</b>: [1 bullet on risks/skepticism]\n"
+                "⚖️ <b>STRATEGIC STANCE</b>: [1-line logic: Buy/Hold/Sell verdict]"
             )
 
             completion = self.client.chat.completions.create(

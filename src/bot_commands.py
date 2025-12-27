@@ -372,10 +372,23 @@ This platform is free and open-source, but running the AI models and infrastruct
                 return "⚪️"
 
             m1d = get_dir(quote.get('percent_change', 0))
+            p1d_str = f"{quote['percent_change']:+.2f}%"
+            
+            p5d = performance.get('5d_pct', 'N/A')
+            p5d_str = f"{p5d:+.2f}%" if isinstance(p5d, (int, float)) else "N/A"
+            m5d = get_dir(p5d)
+            
+            p1m = performance.get('1m_pct', 'N/A')
+            p1m_str = f"{p1m:+.2f}%" if isinstance(p1m, (int, float)) else "N/A"
+            m1m = get_dir(p1m)
             
             report = (
                 f"⚡️ <b>QUICK NARRATIVE: {ticker}</b>\n"
-                f"Price: ${quote['current_price']:,.2f} ({m1d} {quote['percent_change']:+.2f}%)\n"
+                f"<code>"
+                f"1D: {m1d} {p1d_str}\n"
+                f"5D: {m5d} {p5d_str}\n"
+                f"1M: {m1m} {p1m_str}"
+                f"</code>\n"
                 f"────────────────────────\n"
                 f"{interpretation}\n"
                 f"────────────────────────"
