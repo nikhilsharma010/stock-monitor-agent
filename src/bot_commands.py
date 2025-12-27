@@ -65,7 +65,7 @@ class TelegramBotHandler:
         try:
             url = f"{self.api_url}/sendMessage"
             payload = {
-                'chat_id': self.chat_id,
+                'chat_id': chat_id or self.chat_id,
                 'text': text,
                 'parse_mode': 'HTML'
             }
@@ -174,10 +174,10 @@ class TelegramBotHandler:
 Use /list to see your personal stocks.
 """
 
-    def handle_analyse(self, ticker):
+    def handle_analyse(self, ticker, chat_id):
         """Perform 60-day 'Deep Intelligence' analysis on a stock."""
         ticker = ticker.upper().strip()
-        self.send_message(f"🔍 <b>Generating Deep Intelligence Report for {ticker}...</b>\nFetching 60 days of context and sector trends. Please wait.")
+        self.send_message(f"🔍 <b>Generating Deep Intelligence Report for {ticker}...</b>\nFetching 60 days of context and sector trends. Please wait.", chat_id=chat_id)
         
         try:
             # 1. Fetch Metrics
@@ -217,7 +217,7 @@ Use /list to see your personal stocks.
             logger.error(f"Crash in handle_analyse: {e}", exc_info=True)
             return f"❌ Analysis failed: {str(e)}"
 
-    def handle_ask(self, parts_text):
+    def handle_ask(self, parts_text, chat_id):
         """Handle user questions about a stock."""
         parts = parts_text.split(maxsplit=1)
         if len(parts) < 2:
@@ -226,7 +226,7 @@ Use /list to see your personal stocks.
         ticker = parts[0].upper().strip()
         question = parts[1]
         
-        self.send_message(f"🤔 <b>Consulting AI about {ticker}...</b>")
+        self.send_message(f"🤔 <b>Consulting AI about {ticker}...</b>", chat_id=chat_id)
         
         # We try to get news too if possible for better context
         # But we don't have direct access to NewsMonitor here easily without passing it
@@ -241,14 +241,14 @@ Use /list to see your personal stocks.
             logger.error(f"Error in handle_ask: {e}", exc_info=True)
             return f"❌ Failed to get AI answer: {str(e)}"
     
-    def handle_compare(self, args):
+    def handle_compare(self, args, chat_id):
         """Compare two stock tickers."""
         tickers = args.upper().strip().split()
         if len(tickers) < 2:
             return "❌ Usage: /compare TICKER1 TICKER2\nExample: /compare AAPL MSFT"
         
         t1, t2 = tickers[0], tickers[1]
-        self.send_message(f"⚖️ <b>Comparing {t1} vs {t2}...</b>\nGathering data and AI comparison. This will take a moment.")
+        self.send_message(f"⚖️ <b>Comparing {t1} vs {t2}...</b>\nGathering data and AI comparison. This will take a moment.", chat_id=chat_id)
         
         try:
             # Gather data for both
@@ -296,7 +296,7 @@ Use /list to see your personal stocks.
         lines.append(f"Server Time: {datetime.now().strftime('%H:%M:%S')}")
         return "\n".join(lines)
     
-    def process_command(self, message_text, user_id):
+    def process_command(self, message_text, user_id, chat_id):
         """Process a command message."""
         try:
             parts = message_text.strip().split(maxsplit=1)
@@ -326,13 +326,13 @@ Use /list to see your personal stocks.
             elif command == '/analyse' or command == '/analyze':
                 if not args:
                     return "❌ Usage: /analyse TICKER\nExample: /analyse AAPL"
-                return self.handle_analyse(args)
+                return self.handle_analyse(args, chat_id)
             elif command == '/ask':
                 if not args:
                     return "❌ Usage: /ask TICKER QUESTION\nExample: /ask CCCC What does this company do?"
-                return self.handle_ask(args)
+                return self.handle_ask(args, chat_id)
             elif command == '/compare':
-                return self.handle_compare(args)
+                return self.handle_compare(args, chat_id)
             elif command == '/debug':
                 return self.handle_debug()
             else:
@@ -352,12 +352,7 @@ Use /list to see your personal stocks.
                 continue
             
             message = update['message']
-            chat_id = str(message['chat'].get('id'))
-            
-            # Log the chat ID for debugging if it doesn't match
-            if chat_id != str(self.chat_id):
-                logger.warning(f"Ignoring message from unauthorized Chat ID: {chat_id}. Your configured ID is: {self.chat_id}")
-                continue
+            chat_id = message['chat'].get('id')
             
             # Only process text messages
             if 'text' not in message:
@@ -383,7 +378,7 @@ Use /list to see your personal stocks.
             self.cache.log_user_command(user_id, username, first_name, cmd_name, cmd_args)
             
             logger.info(f"Processing command: {text} from user {username}")
-            response = self.process_command(text, user_id)
+            response = self.process_command(text, user_id, chat_id)
             self.send_message(response, chat_id=chat_id)
     def start_polling(self):
         """Start a continuous loop to check for commands (for background thread)."""
