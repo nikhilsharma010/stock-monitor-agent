@@ -307,7 +307,7 @@ This platform is free and open-source, but running the AI models and infrastruct
                 f"Rev. Growth:    {metrics['revenue_growth']}%\n"
                 f"ROIC:           {metrics['roic']}%"
                 f"</code>\n\n"
-                f"⚡️ <b>FIRST-PRINCIPLES ANALYSIS</b>\n"
+                f"🧠 <b>UNIFIED INTELLIGENCE</b>\n"
                 f"{commentary}\n"
                 f"────────────────────────"
             )
@@ -341,62 +341,6 @@ This platform is free and open-source, but running the AI models and infrastruct
             logger.error(f"Error in handle_ask: {e}", exc_info=True)
             return f"❌ Failed to get AI answer: {str(e)}"
     
-    def handle_why(self, args, chat_id):
-        """Ultra-compressed 'Why it moved' report."""
-        if not args:
-            return "❌ Usage: /why TICKER\nExample: /why NVDA"
-        
-        ticker = args.upper().strip()
-        self.send_message(f"🕵️‍♂️ <b>Decoding recent moves for {ticker}...</b>", chat_id=chat_id)
-        
-        try:
-            # 1. Fetch Context
-            quote = self.analyzer.get_stock_quote(ticker)
-            metrics = self.analyzer.get_basic_financials(ticker)
-            profile = self.analyzer.get_company_profile(ticker)
-            performance = self.analyzer.get_performance_metrics(ticker)
-            
-            from news_monitor import NewsMonitor
-            news_mon = NewsMonitor()
-            news = news_mon.get_company_news(ticker, days_back=60)
-            
-            # 2. Get AI Interpretation
-            interpretation = self.analyzer.get_ai_why_interpretation(
-                ticker, metrics, quote, news=news, profile=profile, performance=performance
-            )
-            
-            # Helper for indicators
-            def get_dir(val):
-                if isinstance(val, (int, float)):
-                    return "🟢" if val > 0 else "🔴" if val < 0 else "⚪️"
-                return "⚪️"
-
-            m1d = get_dir(quote.get('percent_change', 0))
-            p1d_str = f"{quote['percent_change']:+.2f}%"
-            
-            p5d = performance.get('5d_pct', 'N/A')
-            p5d_str = f"{p5d:+.2f}%" if isinstance(p5d, (int, float)) else "N/A"
-            m5d = get_dir(p5d)
-            
-            p1m = performance.get('1m_pct', 'N/A')
-            p1m_str = f"{p1m:+.2f}%" if isinstance(p1m, (int, float)) else "N/A"
-            m1m = get_dir(p1m)
-            
-            report = (
-                f"⚡️ <b>QUICK NARRATIVE: {ticker}</b>\n"
-                f"<code>"
-                f"1D: {m1d} {p1d_str}\n"
-                f"5D: {m5d} {p5d_str}\n"
-                f"1M: {m1m} {p1m_str}"
-                f"</code>\n"
-                f"────────────────────────\n"
-                f"{interpretation}\n"
-                f"────────────────────────"
-            )
-            return report
-        except Exception as e:
-            logger.error(f"Error in handle_why: {e}", exc_info=True)
-            return f"❌ Failed to decode moves: {str(e)}"
     
     def handle_compare(self, args, chat_id):
         """Compare two stock tickers."""
@@ -501,12 +445,11 @@ This platform is free and open-source, but running the AI models and infrastruct
                 return self.handle_set_interval(args)
             elif command == '/status':
                 return self.handle_status()
-            elif command == '/snapshot' or command == '/analyse' or command == '/analyze':
+            elif command == '/snapshot' or command == '/analyse' or command == '/analyze' or command == '/why':
                 if not args:
-                    return "❌ Usage: /snapshot TICKER\nExample: /snapshot AAPL"
+                    cmd_name = command[1:]
+                    return f"❌ Usage: /{cmd_name} TICKER\nExample: /{cmd_name} AAPL"
                 return self.handle_analyse(args, chat_id)
-            elif command == '/why':
-                return self.handle_why(args, chat_id)
             elif command == '/ask':
                 if not args:
                     return "❌ Usage: /ask TICKER QUESTION\nExample: /ask CCCC What does this company do?"

@@ -240,26 +240,22 @@ class StockAnalyzer:
             else:
                 system_prompt = (
                     f"You are a Senior Strategic Advisor. Industry: {industry}.\n"
+                    "TASK: Perform a 'Unified Intelligence' analysis (Macro context + Recent 'Why').\n"
                     "CORE RULES:\n"
-                    "1. FIRST PRINCIPLES: Analyze the narrative based on structural drivers, not just price.\n"
-                    "2. MACRO CONTEXT: Consider industry trends or macro shifts (rates, regulation).\n"
-                    "3. CONVICTION: Use volume and multi-timeframe returns to gauge momentum strength.\n"
-                    "4. RICH FORMATTING: Use bold for headers and critical terms. Use italics for nuanced interpretations.\n"
-                    "5. AESTHETICS: Use consistent emojis (e.g., 🔴 for risks, 📊 for data, 🏭 for industry).\n"
-                    "6. STRICT BULLETS: Use only bullet points for all sections. No paragraphs.\n"
-                    "7. ZERO HALLUCINATION: If a metric is 'N/A', do not interpret it. Say 'Insufficient Data'.\n"
-                    "8. OPERATOR UX: Be concise. Max 200 words total."
+                    "1. BALANCED PERSPECTIVE: You must provide both Bull and Bear cases.\n"
+                    "2. NARRATIVE DRIVEN: Analyze the 30-day window. If news is thin, interpret moves vs. industry benchmarks or clinical/product cycles (e.g. Phase 2 trials).\n"
+                    "3. RICH FORMATTING: Use bold for headers. Use only bullet points.\n"
+                    "4. OPERATOR UX: Be direct. Max 200 words."
                 )
                 user_prompt = (
                     f"Perform a 'Deep Intelligence' report for {ticker} over the last 60 days.\n\n"
                     f"Data: {metrics_str}\n{price_context}\n{news_context}\n\n"
                     "FORMATTING SPECIFICATION:\n"
-                    "• 📝 <b>[SUMMARY]</b>: 1-2 bold bullets on the core narrative.\n"
-                    "• ⚙️ <b>[DRIVERS]</b>: 2-3 bullets on fundamental catalysts.\n"
-                    "• 🔴 <b>[RISKS]</b>: 2 bold bullets on critical red flags (<i>watch out for...</i>).\n"
-                    "• 🏭 <b>[INDUSTRY]</b>: 1-2 bullets on sector-wide impacts.\n"
-                    "• 🎯 <b>[OUTLOOK]</b>: What to watch in the next 30 days.\n"
-                    "• ⭐ <b>[RATING]</b>: ⭐ ⭐ ⭐ <b>BUY/HOLD/SELL</b> - <i>Logic in italics.</i>"
+                    "• 🔍 <b>THE NARRATIVE</b>: 1-line summary of the core market story.\n"
+                    "• 📈 <b>BULL CASE</b>: 2 bullets on positive catalysts/upside drivers.\n"
+                    "• 📉 <b>BEAR CASE</b>: 2 bullets on critical red flags/risks (<i>skepticism</i>).\n"
+                    "• 🏭 <b>INDUSTRY CONTEXT</b>: 1-2 bullets on sector-wide impacts.\n"
+                    "• ⭐ <b>STRATEGIC STANCE</b>: ⭐ ⭐ ⭐ <b>BUY/HOLD/SELL</b> - <i>1-sentence tactical logic.</i>"
                 )
 
             chat_completion = self.client.chat.completions.create(
@@ -278,57 +274,6 @@ class StockAnalyzer:
             logger.error(f"Error generating AI deep commentary for {ticker}: {str(e)}")
             return f"⚠️ AI deep analysis failed: {str(e)}"
 
-    def get_ai_why_interpretation(self, ticker, metrics, quote, news=None, profile=None, performance=None):
-        """Ultra-compressed interpretation of recent moves."""
-        if not self.client:
-            self.groq_api_key = self._find_groq_key()
-            if self.groq_api_key:
-                self.client = Groq(api_key=self.groq_api_key)
-            else:
-                return "AI analysis disabled."
-
-        try:
-            # High-density context for 'Why'
-            price = quote.get('current_price', 'N/A')
-            chg = quote.get('percent_change', 'N/A')
-            p5d = performance.get('5d_pct', 'N/A') if performance else 'N/A'
-            p5d_str = f"{p5d:+.2f}%" if isinstance(p5d, (int, float)) else str(p5d)
-            
-            headlines = [n['headline'] for n in news[:8]] if news else []
-            news_str = "\n".join([f"- {h}" for h in headlines])
-            
-            industry = profile.get('finnhubIndustry', 'N/A') if profile else "N/A"
-
-            system_prompt = (
-                f"You are a World-Class Market Strategist. Analyze {ticker} ({industry}).\n"
-                "TASK: Decode the narrative behind recent moves (1D to 30D).\n"
-                "RULES: 1. Max 120 words. 2. Balanced view: Must show BOTH Bull and Bear factors. 3. Be direct."
-            )
-            user_prompt = (
-                f"TICKER: {ticker}\n"
-                f"RETURNS: 1D({chg:+.2f}%), 5D({p5d_str}), 1M({p1m_str})\n"
-                f"NEWS/CONTEXT:\n{news_str}\n\n"
-                "If news is thin, interpret price action vs. industry cycles or structural milestones (e.g. trials).\n\n"
-                "FORMAT:\n"
-                "🔍 <b>THE NARRATIVE</b>: [1-line summary]\n"
-                "📈 <b>BULL CASE</b>: [1 bullet on positive drivers]\n"
-                "📉 <b>BEAR CASE</b>: [1 bullet on risks/skepticism]\n"
-                "⚖️ <b>STRATEGIC STANCE</b>: [1-line logic: Buy/Hold/Sell verdict]"
-            )
-
-            completion = self.client.chat.completions.create(
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                model=self.model,
-                temperature=0.2,
-                max_tokens=300
-            )
-            return completion.choices[0].message.content
-        except Exception as e:
-            logger.error(f"Error in 'why' interpretation for {ticker}: {e}")
-            return f"⚠️ Analysis failed: {e}"
 
     def get_ai_comparison(self, t1, m1, q1, t2, m2, q2):
         """Generate a side-by-side AI comparison of two stocks."""
