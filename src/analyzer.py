@@ -350,8 +350,14 @@ FORMAT:
             
             if data.get('s') != 'ok':
                 reason = data.get('s', 'Unknown reason')
+                error_msg = f"Finnhub API Error: {reason}"
+                if reason == 'no_data':
+                    error_msg = "No historical data found for this symbol in the requested timeframe."
+                elif reason == 'error':
+                    error_msg = f"Finnhub API returned generic error. Check if symbol '{ticker}' is valid."
+                
                 logger.error(f"Finnhub Candle Error for {ticker}: {reason}. Data: {data}")
-                return None
+                return None, error_msg
             
             # 2. Prepare Dataframe
             df = pd.DataFrame({
@@ -365,18 +371,18 @@ FORMAT:
             df.set_index('Date', inplace=True)
             
             # 3. Calculate Indicators
+            # (Calculation logic remains the same...)
             df['DMA20'] = df['Close'].rolling(window=20).mean()
             df['DMA50'] = df['Close'].rolling(window=50).mean()
             df['DMA200'] = df['Close'].rolling(window=200).mean()
             
-            # RSI Calculation
             delta = df['Close'].diff()
             gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
             loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
             rs = gain / loss
             df['RSI'] = 100 - (100 / (1 + rs))
             
-            # 4. Plotting (Dark Mode / Professional Aesthetic)
+            # 4. Plotting
             plt.style.use('dark_background')
             fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8), gridspec_kw={'height_ratios': [3, 1]}, sharex=True)
             fig.subplots_adjust(hspace=0.05)
@@ -412,9 +418,9 @@ FORMAT:
             buf.seek(0)
             plt.close(fig)
             
-            return buf
+            return buf, None
             
         except Exception as e:
             logger.error(f"Error generating chart for {ticker}: {e}")
             plt.close('all')
-            return None
+            return None, str(e)

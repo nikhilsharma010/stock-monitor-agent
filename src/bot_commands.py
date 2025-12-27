@@ -352,9 +352,9 @@ This platform is free and open-source, but running the AI models and infrastruct
         self.send_message(f"📊 <b>Generating technical chart for {ticker}...</b>", chat_id=chat_id)
         
         try:
-            chart_buf = self.analyzer.get_stock_chart(ticker)
+            chart_buf, error_reason = self.analyzer.get_stock_chart(ticker)
             if not chart_buf:
-                return f"❌ Failed to generate chart for {ticker}. Symbol might be invalid or data unavailable."
+                return f"❌ Failed to generate chart for {ticker}.\nReason: {error_reason or 'Internal Error'}"
             
             # Use notifier.send_photo
             success = self.notifier.send_photo(
