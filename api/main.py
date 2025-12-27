@@ -7,11 +7,17 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'shared'))
 
 from analyzer import StockAnalyzer
+from app.routes import goals, theses, watchlist
+from app.database import engine
+from app import models
+
+# Create database tables
+models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Alpha Intelligence API",
     description="Financial intelligence platform API",
-    version="1.0.0"
+    version="2.0.0"
 )
 
 # CORS middleware
@@ -20,6 +26,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",  # Next.js dev
         "https://*.vercel.app",   # Vercel deployments
+        "https://alphaintelligence.vercel.app",  # Production
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -29,9 +36,14 @@ app.add_middleware(
 # Initialize services
 analyzer = StockAnalyzer()
 
+# Include routers
+app.include_router(goals.router, prefix="/api/goals", tags=["goals"])
+app.include_router(theses.router, prefix="/api/theses", tags=["theses"])
+app.include_router(watchlist.router, prefix="/api/watchlist", tags=["watchlist"])
+
 @app.get("/")
 def root():
-    return {"message": "Alpha Intelligence API", "version": "1.0.0"}
+    return {"message": "Alpha Intelligence API", "version": "2.0.0"}
 
 @app.get("/health")
 def health_check():
@@ -55,7 +67,6 @@ async def get_stock_analysis(ticker: str):
 async def get_stock_chart(ticker: str):
     """Get stock chart data"""
     try:
-        # This will return chart image path or data
         return {"ticker": ticker, "chart": "chart_data"}
     except Exception as e:
         return {"error": str(e)}
