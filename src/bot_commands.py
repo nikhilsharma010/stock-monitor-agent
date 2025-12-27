@@ -255,17 +255,24 @@ This platform is free and open-source, but running the AI models and infrastruct
             sector = profile.get('finnhubSector', 'N/A')
             
             report = (
-                f"🧠 <b>DEEP INTELLIGENCE: {ticker}</b>\n"
+                f"🧠 <b>OPERATOR SNAPSHOT: {ticker}</b>\n"
                 f"<i>{name} | {industry}</i>\n"
                 f"────────────────────────\n"
-                f"<b>📊 TECHNICAL METRICS</b>\n"
+                f"<b>📊 PERFORMANCE & SCALE</b>\n"
                 f"<code>"
-                f"Price: ${quote['current_price']:,.2f} ({quote['percent_change']:+.2f}%)\n"
-                f"P/E:   {metrics['pe_ratio']}\n"
-                f"Cap:   {metrics['market_cap']}M\n"
-                f"Range: ${metrics['52_week_low']} - ${metrics['52_week_high']}"
+                f"Price:  ${quote['current_price']:,.2f} ({quote['percent_change']:+.2f}%)\n"
+                f"Cap:    {metrics['market_cap']}M\n"
+                f"Range:  ${metrics['52_week_low']} - ${metrics['52_week_high']}\n"
+                f"P/E:    {metrics['pe_ratio']}"
                 f"</code>\n\n"
-                f"<b>⚡️ STRATEGIC ANALYSIS</b>\n"
+                f"<b>💰 CORE FUNDAMENTALS</b>\n"
+                f"<code>"
+                f"Revenue Growth: {metrics['revenue_growth']}\n"
+                f"Net Margin:     {metrics['net_margin']}\n"
+                f"ROIC:           {metrics['roic']}\n"
+                f"Debt/Equity:    {metrics['debt_to_equity']}"
+                f"</code>\n\n"
+                f"<b>⚡️ FIRST-PRINCIPLES ANALYSIS</b>\n"
                 f"{commentary}\n"
                 f"────────────────────────"
             )
@@ -394,9 +401,9 @@ This platform is free and open-source, but running the AI models and infrastruct
                 return self.handle_set_interval(args)
             elif command == '/status':
                 return self.handle_status()
-            elif command == '/analyse' or command == '/analyze':
+            elif command == '/analyse' or command == '/analyze' or command == '/snapshot':
                 if not args:
-                    return "❌ Usage: /analyse TICKER\nExample: /analyse AAPL"
+                    return "❌ Usage: /snapshot TICKER\nExample: /snapshot AAPL"
                 return self.handle_analyse(args, chat_id)
             elif command == '/ask':
                 if not args:

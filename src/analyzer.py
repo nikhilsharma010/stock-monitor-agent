@@ -30,7 +30,7 @@ class StockAnalyzer:
             logger.warning("StockAnalyzer: GROQ_API_KEY not found during initialization.")
 
     def get_basic_financials(self, ticker):
-        """Fetch basic financial metrics (P/E, Market Cap, etc.)."""
+        """Fetch high-density financial metrics (Margins, Growth, Efficiency)."""
         try:
             url = f"{self.finnhub_base_url}/stock/metric"
             params = {
@@ -42,14 +42,20 @@ class StockAnalyzer:
             response.raise_for_status()
             data = response.json()
             
-            # Initialize with N/A
+            # Expanded N/A template
             result = {
                 'pe_ratio': 'N/A',
                 'market_cap': 'N/A',
                 '52_week_high': 'N/A',
                 '52_week_low': 'N/A',
                 'beta': 'N/A',
-                'ps_ratio': 'N/A'
+                'ps_ratio': 'N/A',
+                'net_margin': 'N/A',
+                'operating_margin': 'N/A',
+                'revenue_growth': 'N/A',
+                'eps_growth': 'N/A',
+                'roic': 'N/A',
+                'debt_to_equity': 'N/A'
             }
             
             if data.get('metric'):
@@ -60,21 +66,19 @@ class StockAnalyzer:
                     '52_week_high': m.get('52WeekHigh', 'N/A'),
                     '52_week_low': m.get('52WeekLow', 'N/A'),
                     'beta': m.get('beta', 'N/A'),
-                    'ps_ratio': m.get('psTTM', 'N/A')
+                    'ps_ratio': m.get('psTTM', 'N/A'),
+                    'net_margin': m.get('netProfitMarginTTM', 'N/A'),
+                    'operating_margin': m.get('operatingMarginTTM', 'N/A'),
+                    'revenue_growth': m.get('revenueGrowthYoy', 'N/A'),
+                    'eps_growth': m.get('epsGrowthYoy', 'N/A'),
+                    'roic': m.get('roicTTM', 'N/A'),
+                    'debt_to_equity': m.get('totalDebt/totalEquityTTM', 'N/A')
                 })
             
             return result
         except Exception as e:
             logger.error(f"Error fetching financials for {ticker}: {e}")
-            # Still return N/A template so caller doesn't crash
-            return {
-                'pe_ratio': 'N/A',
-                'market_cap': 'N/A',
-                '52_week_high': 'N/A',
-                '52_week_low': 'N/A',
-                'beta': 'N/A',
-                'ps_ratio': 'N/A'
-            }
+            return result # Returns N/A template
 
     def get_company_profile(self, ticker):
         """Fetch company profile (Industry, Sector, Description)."""
@@ -151,19 +155,29 @@ class StockAnalyzer:
                 news_context = "\nRecent 60-Day News Headlines:\n" + "\n".join([f"- {h}" for h in headlines])
 
             if question:
-                system_prompt = f"You are a Senior Equity Analyst. Industry: {industry}. Provide professional, concise answers using bolding for key terms."
+                system_prompt = (
+                    f"You are a Senior Equity Analyst. Industry: {industry}. "
+                    "Use a First-Principles approach: Break everything down to logical drivers. "
+                    "Always use bullet points. Keep answers objective and grounded."
+                )
                 user_prompt = f"Stock: {ticker}\nMetrics: {metrics_str}\n{price_context}\n{news_context}\n\nQuestion: {question}"
             else:
-                system_prompt = f"You are a Senior Strategic Advisor. Focus: Narrative Tracking & Industry Trends in {industry}."
+                system_prompt = (
+                    f"You are a Senior Strategic Advisor. Industry: {industry}.\n"
+                    "CORE RULES:\n"
+                    "1. FIRST PRINCIPLES: Analyze the narrative based on structural drivers, not just price.\n"
+                    "2. STRICT BULLETS: Use only bullet points for all sections. No paragraphs.\n"
+                    "3. ZERO HALLUCINATION: If a metric is 'N/A', do not interpret it. Say 'Insufficient Data'.\n"
+                    "4. OPERATOR UX: Be concise. Max 150 words total."
+                )
                 user_prompt = (
                     f"Perform a 'Deep Intelligence' report for {ticker} over the last 60 days.\n\n"
                     f"Data: {metrics_str}\n{price_context}\n{news_context}\n\n"
-                    "FORMAT INSTRUCTIONS:\n"
-                    "1. Use [NARRATIVE] for theme/story identification.\n"
-                    "2. Use [INDUSTRY] for positioning.\n"
-                    "3. Use [INSIGHT] for the 30-day outlook.\n"
-                    "4. End with '⭐ RATING: [BUY/HOLD/SELL]' followed by a 1-sentence logic.\n"
-                    "Keep descriptions sharp and professional."
+                    "FORMAT:\n"
+                    "• [SUMMARY] Primary 60-day narrative.\n"
+                    "• [DRIVERS] List 2-3 key fundamental/market drivers.\n"
+                    "• [OUTLOOK] What to watch in the next 30 days.\n"
+                    "• [RATING] ⭐ ⭐ ⭐ [BUY/HOLD/SELL] - 1-sentence logic."
                 )
 
             chat_completion = self.client.chat.completions.create(
@@ -201,16 +215,18 @@ Stock 2: {t2}
 - Price: ${q2['current_price']} ({q2['percent_change']}%)
 - 52W Range: ${m2['52_week_low']} - ${m2['52_week_high']}
 """
-            system_prompt = "You are a world-class equity researcher. Compare two stocks and give a clear verdict on which is the better investment right now. Use structured headers."
+            system_prompt = (
+                "You are a world-class equity researcher. Compare two stocks using First-Principles logic. "
+                "Use bullet points only. Zero speculation on missing data."
+            )
             user_prompt = f"""
 Compare the following two stocks based on the data provided:
 {comparison_context}
 
-FORMAT INSTRUCTIONS:
-1. [VALUATION] Compare metrics and positioning.
-2. [ACTION] Analyze recent price trends relative to ranges.
-3. [VERDICT] State Stock 1 or Stock 2 as the winner.
-4. End with '🏆 WINNER: [TICKER]' followed by a 1-sentence justification.
+FORMAT:
+• [VALUATION] Bulleted comparison.
+• [POSITION] Structural industry standing.
+• [VERDICT] 🏆 WINNER: [TICKER] - 1-sentence logic.
 """
             chat_completion = self.client.chat.completions.create(
                 messages=[
