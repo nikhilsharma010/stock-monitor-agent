@@ -23,7 +23,7 @@ class StockAnalyzer:
         
         if self.groq_api_key:
             self.client = Groq(api_key=self.groq_api_key)
-            self.model = "llama-3.1-70b-versatile"
+            self.model = "llama-3.3-70b-versatile" # Updated to newest supported model
             logger.info("StockAnalyzer: Groq client initialized successfully.")
         else:
             self.client = None
@@ -94,7 +94,7 @@ class StockAnalyzer:
             if self.groq_api_key:
                 try:
                     self.client = Groq(api_key=self.groq_api_key)
-                    self.model = "llama-3.1-70b-versatile"
+                    self.model = "llama-3.3-70b-versatile"
                     logger.info("StockAnalyzer: Late-initialized Groq client.")
                 except Exception as e:
                     logger.error(f"Failed to late-init Groq: {e}")
