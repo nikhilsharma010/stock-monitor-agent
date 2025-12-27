@@ -13,22 +13,37 @@ from utils import logger
 class StockAnalyzer:
     """Handles financial analysis and LLM commentary for stocks."""
     
+    def _find_groq_key(self):
+        """Ultra-resilient search for Groq API key in environment."""
+        # 1. Explicit standard names
+        for key in ['GROQ_API_KEY', 'GROQ_KEY']:
+            val = os.getenv(key)
+            if val: return val
+            
+        # 2. Case-insensitive fuzzy search
+        for k, v in os.environ.items():
+            k_up = k.upper()
+            if 'GROQ' in k_up and 'KEY' in k_up:
+                logger.info(f"StockAnalyzer: Found potential Groq key in env var '{k}'")
+                return v
+        return None
+
     def __init__(self, finnhub_api_key=None, groq_api_key=None):
         self.finnhub_api_key = finnhub_api_key or os.getenv('FINNHUB_API_KEY')
-        self.groq_api_key = groq_api_key or os.getenv('GROQ_API_KEY') or os.getenv('GROQ_KEY')
+        self.groq_api_key = groq_api_key or self._find_groq_key()
         self.finnhub_base_url = "https://finnhub.io/api/v1"
         
-        # Super-debug: Log all env keys
-        all_keys = list(os.environ.keys())
-        logger.debug(f"StockAnalyzer Init: All Env Keys: {all_keys}")
-        
         if self.groq_api_key:
-            self.client = Groq(api_key=self.groq_api_key)
-            self.model = "llama-3.3-70b-versatile" # Updated to newest supported model
-            logger.info("StockAnalyzer: Groq client initialized successfully.")
+            try:
+                self.client = Groq(api_key=self.groq_api_key)
+                self.model = "llama-3.3-70b-versatile"
+                logger.info("StockAnalyzer: Groq client initialized successfully.")
+            except Exception as e:
+                self.client = None
+                logger.error(f"StockAnalyzer: Error initializing Groq: {e}")
         else:
             self.client = None
-            logger.warning("StockAnalyzer: GROQ_API_KEY not found during initialization.")
+            logger.warning("StockAnalyzer: No Groq key found in environment.")
 
     def get_basic_financials(self, ticker):
         """Fetch high-density financial metrics (Margins, Growth, Efficiency)."""
@@ -174,7 +189,7 @@ class StockAnalyzer:
         """Generate Deep AI commentary using Groq."""
         # Dynamic re-check for key if missing
         if not self.client:
-            self.groq_api_key = os.getenv('GROQ_API_KEY') or os.getenv('GROQ_KEY')
+            self.groq_api_key = self._find_groq_key()
             if self.groq_api_key:
                 try:
                     self.client = Groq(api_key=self.groq_api_key)
