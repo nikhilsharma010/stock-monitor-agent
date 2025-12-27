@@ -13,12 +13,14 @@ from analyzer import StockAnalyzer
 class TelegramBotHandler:
     """Handles incoming Telegram commands for managing stocks and settings."""
     
-    def __init__(self, bot_token=None, chat_id=None, config_path='config/stocks.json'):
+    def __init__(self, bot_token=None, chat_id=None, config_path='config/stocks.json', cache=None):
         self.bot_token = bot_token or os.getenv('TELEGRAM_BOT_TOKEN')
         self.chat_id = chat_id or os.getenv('TELEGRAM_CHAT_ID')
         self.config_path = config_path
         self.api_url = f"https://api.telegram.org/bot{self.bot_token}"
         self.last_update_id = 0
+        from utils import CacheDB
+        self.cache = cache or CacheDB()
         self.analyzer = StockAnalyzer()
         
     def load_config(self):
