@@ -1,111 +1,84 @@
-# Interactive Bot Commands Guide
+# 🚀 Stock Monitor Agent - Command Guide
 
-## 🎮 Control Your Stock Monitor via Telegram!
+Welcome to your personalized "Bloomberg Terminal" in Telegram. The agent is now a **Multi-User Platform** where you can manage your own private watchlist and get deep AI insights.
 
-You can now manage your stock monitor directly from Telegram using simple commands.
+---
 
-## Available Commands
+## 🏎️ Core Interactive Commands
 
-### 📊 Stock Management
+### 📊 Watchlist Management (Personal)
+*These commands manage **your** private watchlist. Other users won't see your stocks.*
 
 **Add a stock to monitor:**
 ```
 /add TICKER
 ```
-Example: `/add AAPL` - Adds Apple stock to monitoring
+Example: `/add AAPL` - You will now get price & news alerts for Apple.
 
 **Remove a stock:**
 ```
 /remove TICKER
 ```
-Example: `/remove BYND` - Stops monitoring Beyond Meat
+Example: `/remove BYND`
 
-**List all stocks:**
+**List your watchlist:**
 ```
 /list
 ```
-Shows all active and disabled stocks with current settings
+Shows exactly which stocks **you** are currently monitoring.
 
-### 🧠 AI Analysis & Expert Commentary
+---
 
-**Detailed Analysis:**
+### ⚖️ Side-by-Side Comparison
+**Compare two stocks:**
+```
+/compare TICKER1 TICKER2
+```
+Example: `/compare AAPL MSFT`
+*AI analyzes both companies and gives a clear "Better Buy" verdict.*
+
+---
+
+### 🧠 60-Day Deep Intelligence
+**Advanced Analysis:**
 ```
 /analyse TICKER
 ```
-Example: `/analyse CCCC` - Returns fundamental data (P/E, Market Cap) + AI Buy/Hold/Sell recommendation.
+Example: `/analyse TSLA`
+*AI studies the last **60 days** of news, sector trends, and narratives to give you a strategic rating.*
 
 **Ask the AI Expert:**
 ```
 /ask TICKER QUESTION
 ```
-Example: `/ask CCCC Who are their main competitors?` - Returns a factored answer about the company.
+Example: `/ask CCCC Who are their main competitors?`
+*Factored answer based on financial data and industry position.*
 
-### ⚙️ Settings
+---
+
+### ⚙️ System & Settings
 
 **Change check interval:**
 ```
 /interval MINUTES
 ```
-Examples:
-- `/interval 1` - Check every 1 minute
-- `/interval 5` - Check every 5 minutes  
-- `/interval 15` - Check every 15 minutes (default)
-- `/interval 60` - Check every hour
+Example: `/interval 5` - Check price/news every 5 mins.
 
 **Check current status:**
 ```
 /status
 ```
-Shows how many stocks you're monitoring and current settings
+Shows system-wide metrics: Total Users, Total Commands, and system health.
 
 **Get help:**
 ```
 /help
 ```
-Shows all available commands
+---
 
-## Quick Examples
+## ✨ Pro Tips
+- **Private by Default**: Your `/add` and `/list` commands are unique to you. 
+- **Live Updates**: All changes take effect **immediately**. No restarts needed.
+- **Deep Memory**: The `/analyse` command has "60-day memory" to spot trends that others miss.
 
-### Add Multiple Stocks
-```
-/add AAPL
-/add TSLA
-/add NVDA
-/list
-```
-
-### Change to Fast Updates
-```
-/interval 1
-```
-Now you'll get updates every minute!
-
-### Remove a Stock
-```
-/remove BYND
-/list
-```
-
-## ✨ Live Updates
-
-The agent now supports **Live Configuration Updates**. Changes you make via Telegram commands (like adding a stock or changing the interval) take effect **immediately** without needing to restart the bot! 🚀
-
-## Current Configuration
-
-Your bot: `@Trade_stalker_010_bot`
-
-Currently monitoring:
-- CCCC (C4 Therapeutics)
-- BYND (Beyond Meat)
-
-Check interval: 15 minutes
-Price threshold: 0.5%
-
-## Try It Now!
-
-Open Telegram and send:
-```
-/help
-```
-
-to see all commands!
+🚀 **Go ahead and /add your first stock to begin!**
