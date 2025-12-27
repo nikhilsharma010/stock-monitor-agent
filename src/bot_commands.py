@@ -277,13 +277,19 @@ This platform is free and open-source, but running the AI models and infrastruct
             p1m = performance.get('1m_pct', 'N/A')
             p1m_str = f"{p1m:+.2f}%" if isinstance(p1m, (int, float)) else "N/A"
 
+            chg1d = quote.get('percent_change', 'N/A')
+            chg1d_str = f"{chg1d:+.2f}%" if isinstance(chg1d, (int, float)) else "N/A"
+            curr_p = quote.get('current_price', 'N/A')
+            curr_p_str = f"${curr_p:,.2f}" if isinstance(curr_p, (int, float)) else "N/A"
+
             report = (
                 f"🧠 <b>OPERATOR SNAPSHOT: {ticker}</b>\n"
                 f"<i>{name} | {industry}</i>\n"
                 f"────────────────────────\n"
                 f"📈 <b>MOMENTUM & SCALE</b>\n"
                 f"<code>"
-                f"1D Performance: {m1d} {quote['percent_change']:+.2f}%\n"
+                f"Price:          {curr_p_str}\n"
+                f"1D Performance: {m1d} {chg1d_str}\n"
                 f"5D Performance: {m5d} {p5d_str}\n"
                 f"1M Performance: {m1m} {p1m_str}\n"
                 f"Market Cap:     {metrics['market_cap']}M"

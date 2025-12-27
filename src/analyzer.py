@@ -202,10 +202,18 @@ class StockAnalyzer:
         
         try:
             # Context Preparation
-            price_context = f"Price: ${quote['current_price']} ({quote['percent_change']}%). "
+            price = quote.get('current_price', 'N/A')
+            chg = quote.get('percent_change', 'N/A')
+            price_context = f"Price: ${price} ({chg}%). "
+            
             if performance:
+                p5d = performance.get('5d_pct', 'N/A')
+                p5d_str = f"{p5d:.2f}%" if isinstance(p5d, (int, float)) else str(p5d)
+                p1m = performance.get('1m_pct', 'N/A')
+                p1m_str = f"{p1m:.2f}%" if isinstance(p1m, (int, float)) else str(p1m)
+                
                 price_context += (
-                    f"Performance: 5D({performance['5d_pct']:.2f}%), 1M({performance['1m_pct']:.2f}%). "
+                    f"Performance: 5D({p5d_str}), 1M({p1m_str}). "
                     f"Volume: {performance['curr_vol']} vs 10D Avg: {metrics['volume_avg_10d']}."
                 )
             
