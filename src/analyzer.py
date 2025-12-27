@@ -42,21 +42,39 @@ class StockAnalyzer:
             response.raise_for_status()
             data = response.json()
             
-            if not data.get('metric'):
-                return None
-            
-            metrics = data['metric']
-            return {
-                'pe_ratio': metrics.get('peExclExtraTTM'),
-                'market_cap': metrics.get('marketCapitalization'),
-                '52_week_high': metrics.get('52WeekHigh'),
-                '52_week_low': metrics.get('52WeekLow'),
-                'beta': metrics.get('beta'),
-                'ps_ratio': metrics.get('psTTM')
+            # Initialize with N/A
+            result = {
+                'pe_ratio': 'N/A',
+                'market_cap': 'N/A',
+                '52_week_high': 'N/A',
+                '52_week_low': 'N/A',
+                'beta': 'N/A',
+                'ps_ratio': 'N/A'
             }
+            
+            if data.get('metric'):
+                m = data['metric']
+                result.update({
+                    'pe_ratio': m.get('peExclExtraTTM', 'N/A'),
+                    'market_cap': m.get('marketCapitalization', 'N/A'),
+                    '52_week_high': m.get('52WeekHigh', 'N/A'),
+                    '52_week_low': m.get('52WeekLow', 'N/A'),
+                    'beta': m.get('beta', 'N/A'),
+                    'ps_ratio': m.get('psTTM', 'N/A')
+                })
+            
+            return result
         except Exception as e:
             logger.error(f"Error fetching financials for {ticker}: {e}")
-            return None
+            # Still return N/A template so caller doesn't crash
+            return {
+                'pe_ratio': 'N/A',
+                'market_cap': 'N/A',
+                '52_week_high': 'N/A',
+                '52_week_low': 'N/A',
+                'beta': 'N/A',
+                'ps_ratio': 'N/A'
+            }
 
     def get_company_profile(self, ticker):
         """Fetch company profile (Industry, Sector, Description)."""

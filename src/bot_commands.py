@@ -235,8 +235,6 @@ Use /list to see your personal stocks.
         try:
             # 1. Fetch Metrics
             metrics = self.analyzer.get_basic_financials(ticker)
-            if not metrics:
-                return f"❌ Failed to fetch financial metrics for {ticker}."
             
             # 2. Fetch Quote
             quote = self.analyzer.get_stock_quote(ticker)
