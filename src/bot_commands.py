@@ -128,18 +128,24 @@ class TelegramBotHandler:
             return f"❌ Failed to remove {ticker} or ticker not found."
     
     def handle_list_stocks(self, user_id):
-        """List user's personal monitored stocks."""
+        """List user's personal monitored stocks with interactive buttons."""
         tickers = self.cache.get_user_watchlist(user_id)
         
         if not tickers:
-            return "📭 <b>Your Watchlist is Empty</b>\n\nUse /add TICKER to start monitoring stocks."
+            return "📭 <b>Your Watchlist is Empty</b>\n\nUse /add TICKER to start monitoring stocks.", None
         
         message = "📊 <b>Your Personal Watchlist</b>\n\n"
+        keyboard = {"inline_keyboard": []}
+        
         for ticker in sorted(tickers):
             message += f"  • {ticker}\n"
-        
-        message += "\nUse /analyse TICKER for deep insights!"
-        return message
+            keyboard["inline_keyboard"].append([
+                {"text": f"📈 {ticker} Chart", "callback_data": f"chart:{ticker}"},
+                {"text": f"🧠 {ticker} Snap", "callback_data": f"snap:{ticker}"}
+            ])
+            
+        message += "\n<i>Tap a button for instant deep intelligence.</i>"
+        return message, json.dumps(keyboard)
     
     def handle_set_interval(self, minutes):
         """Set check interval in minutes."""
@@ -312,11 +318,20 @@ This platform is free and open-source, but running the AI models and infrastruct
                 f"{commentary}\n"
                 f"────────────────────────"
             )
-            return report
-            
+            report += f"\n\n<b>🗓 EARNINGS PROXIMITY</b>\nNext Earnings: <code>{metrics.get('next_earnings')}</code> ({metrics.get('days_to_earnings')} days)"
+
+            # Snapshot Footer with Buttons
+            keyboard = {"inline_keyboard": [
+                [
+                    {"text": "📈 View Technical Chart", "callback_data": f"chart:{ticker}"},
+                    {"text": "⚖️ Compare Ticker", "callback_data": f"prompt_compare:{ticker}"}
+                ]
+            ]}
+
+            return report, json.dumps(keyboard)
         except Exception as e:
-            logger.error(f"Crash in handle_analyse: {e}", exc_info=True)
-            return f"❌ Analysis failed: {str(e)}"
+            logger.error(f"Error in handle_analyse: {e}", exc_info=True)
+            return f"❌ Failed to generate report: {str(e)}", None
 
     def handle_ask(self, parts_text, chat_id):
         """Handle user questions about a stock."""
@@ -466,59 +481,86 @@ This platform is free and open-source, but running the AI models and infrastruct
             args = parts[1] if len(parts) > 1 else ''
             
             if command == '/start':
-                return self.handle_help()
+                return self.handle_help(), None
             elif command == '/help':
-                return self.handle_help()
+                return self.handle_help(), None
             elif command == '/add':
                 if not args:
-                    return "❌ Usage: /add TICKER\nExample: /add AAPL"
-                return self.handle_add_stock(args, user_id)
+                    return "❌ Usage: /add TICKER\nExample: /add AAPL", None
+                return self.handle_add_stock(args, user_id), None
             elif command == '/remove':
                 if not args:
-                    return "❌ Usage: /remove TICKER\nExample: /remove BYND"
-                return self.handle_remove_stock(args, user_id)
+                    return "❌ Usage: /remove TICKER\nExample: /remove BYND", None
+                return self.handle_remove_stock(args, user_id), None
             elif command == '/list':
                 return self.handle_list_stocks(user_id)
             elif command == '/interval':
                 if not args:
                     return "❌ Usage: /interval MINUTES\nExample: /interval 5"
-                return self.handle_set_interval(args)
+                return self.handle_set_interval(args), None
             elif command == '/status':
-                return self.handle_status()
+                return self.handle_status(), None
             elif command == '/snapshot' or command == '/analyse' or command == '/analyze' or command == '/why':
                 if not args:
                     cmd_name = command[1:]
-                    return f"❌ Usage: /{cmd_name} TICKER\nExample: /{cmd_name} AAPL"
+                    return f"❌ Usage: /{cmd_name} TICKER\nExample: /{cmd_name} AAPL", None
                 return self.handle_analyse(args, chat_id)
             elif command == '/chart':
-                return self.handle_chart(args, chat_id)
+                return self.handle_chart(args, chat_id), None
             elif command == '/ask':
                 if not args:
-                    return "❌ Usage: /ask TICKER QUESTION\nExample: /ask CCCC What does this company do?"
-                return self.handle_ask(args, chat_id)
+                    return "❌ Usage: /ask TICKER QUESTION\nExample: /ask CCCC What does this company do?", None
+                return self.handle_ask(args, chat_id), None
             elif command == '/compare':
-                return self.handle_compare(args, chat_id)
+                return self.handle_compare(args, chat_id), None
             elif command == '/debug':
-                return self.handle_debug()
+                return self.handle_debug(), None
             elif command == '/ping':
-                return "🏓 <b>Pong!</b> Bot is online and responsive."
+                return "🏓 <b>Pong!</b> Bot is online and responsive.", None
             elif command == '/donate':
-                return self.handle_donate()
+                return self.handle_donate(), None
             else:
-                return f"❌ Unknown command: {command}\n\nUse /help to see available commands"
+                return f"❌ Unknown command: {command}\n\nUse /help to see available commands", None
         except Exception as e:
             logger.error(f"Error processing command {message_text}: {e}", exc_info=True)
             return f"❌ An internal error occurred while processing your command: {str(e)}"
     
+    def handle_callback_query(self, callback_query):
+        """Process inline button clicks."""
+        dq_id = callback_query.get('id')
+        data = callback_query.get('data', '')
+        chat_id = callback_query.get('message', {}).get('chat', {}).get('id')
+        user_id = callback_query.get('from', {}).get('id')
+        
+        # Answer immediately to stop spinner
+        requests.post(f"{self.api_url}/answerCallbackQuery", json={'callback_query_id': dq_id})
+        
+        if not data: return
+        
+        action, ticker = data.split(':') if ':' in data else (data, '')
+        
+        if action == 'chart':
+            self.handle_chart(ticker, chat_id)
+        elif action == 'snap':
+            # handle_analyse returns tuple (msg, kb_json), we need to send it
+            msg, kb = self.handle_analyse(ticker, chat_id)
+            self.telegram_notifier.send_message(msg, chat_id=chat_id, reply_markup=kb)
+        elif action == 'prompt_compare':
+            self.telegram_notifier.send_message(f"🔍 <b>To compare {ticker}</b>, type: <code>/compare {ticker} TICKER2</code>", chat_id=chat_id)
+
     def check_and_handle_commands(self):
-        """Check for new commands and handle them with strict state tracking."""
+        """Check for new commands and callback queries."""
         updates = self.get_updates()
         
         for update in updates:
-            # Update state immediately to mark as received
             current_update_id = update['update_id']
             self.last_update_id = current_update_id
             
+            # Handle Callback Queries (Buttons)
+            if 'callback_query' in update:
+                self.handle_callback_query(update['callback_query'])
+                continue
+
             if 'message' not in update:
                 continue
             
@@ -528,7 +570,6 @@ This platform is free and open-source, but running the AI models and infrastruct
             user_id = user.get('id')
             username = user.get('username', 'N/A')
             
-            # Only process text messages
             if 'text' not in message:
                 continue
             
@@ -539,7 +580,6 @@ This platform is free and open-source, but running the AI models and infrastruct
             logger.info(f"📥 COMMAND RECEIVED: '{text}' from @{username} (Chat: {chat_id})")
             
             try:
-                # Log for analytics
                 first_name = user.get('first_name', 'N/A')
                 parts = text.strip().split(maxsplit=1)
                 cmd_name = parts[0].lower()
@@ -547,24 +587,21 @@ This platform is free and open-source, but running the AI models and infrastruct
                 self.cache.log_user_command(user_id, username, first_name, cmd_name, cmd_args)
                 
                 # Process and Reply
-                response = self.process_command(text, user_id, chat_id)
+                response, reply_markup = self.process_command(text, user_id, chat_id)
                 if response:
-                    self.send_message(response, chat_id=chat_id)
+                    self.telegram_notifier.send_message(response, chat_id=chat_id, reply_markup=reply_markup)
                     logger.info(f"📤 REPLY SENT to @{username}")
             except Exception as e:
                 logger.error(f"Error processing command '{text}': {e}", exc_info=True)
                 self.send_message(f"❌ Sorry, an error occurred: {str(e)}", chat_id=chat_id)
+
     def start_polling(self):
-        """Start a continuous loop to check for commands (for background thread)."""
+        """Start a continuous loop to check for commands."""
         logger.info("Bot command polling started (Background Thread)")
-        count = 0
         while True:
             try:
-                count += 1
-                if count % 10 == 0:  # Heartbeat every ~5 mins (assuming 30s long polling)
-                    logger.info("Bot polling heartbeat: background thread is alive and listening.")
                 self.check_and_handle_commands()
+                time.sleep(1) # Poll more frequently for buttons
             except Exception as e:
                 logger.error(f"Error in bot polling loop: {e}")
-                import time
-                time.sleep(5)  # Wait before retrying on error
+                time.sleep(5)

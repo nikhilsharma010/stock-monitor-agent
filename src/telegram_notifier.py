@@ -19,7 +19,7 @@ class TelegramNotifier:
         self.api_url = f"https://api.telegram.org/bot{self.bot_token}"
         logger.info("Telegram notifier initialized")
     
-    def send_message(self, message, chat_id=None, parse_mode='HTML'):
+    def send_message(self, message, chat_id=None, parse_mode='HTML', reply_markup=None):
         """
         Send a message via Telegram.
         
@@ -27,6 +27,7 @@ class TelegramNotifier:
             message: Text message to send
             chat_id: Optional recipient chat ID (falls back to default)
             parse_mode: 'HTML' or 'Markdown' for formatting
+            reply_markup: Optional InlineKeyboardMarkup or similar
         """
         target_chat_id = chat_id or self.chat_id
         if not target_chat_id:
@@ -41,6 +42,8 @@ class TelegramNotifier:
                 'parse_mode': parse_mode,
                 'disable_web_page_preview': False
             }
+            if reply_markup:
+                payload['reply_markup'] = reply_markup
             
             response = requests.post(url, json=payload, timeout=10)
             response.raise_for_status()
@@ -108,6 +111,18 @@ class TelegramNotifier:
         if url:
             message += f'\n🔗 <a href="{url}">Read more</a>'
         
+        return self.send_message(message, chat_id=chat_id)
+
+    def send_anomaly_alert(self, ticker, company_name, alert_text, chat_id=None):
+        """Send a high-conviction anomaly alert (Volume/Earnings)."""
+        message = f"""
+🚦 <b>PRO INTELLIGENCE ALERT: {ticker}</b>
+
+<b>{company_name}</b>
+{alert_text}
+
+<i>Use /snapshot {ticker} for deep analysis.</i>
+"""
         return self.send_message(message, chat_id=chat_id)
     
     def send_photo(self, photo_bytes, caption=None, chat_id=None):

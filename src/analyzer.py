@@ -99,6 +99,12 @@ class StockAnalyzer:
                 'debt_to_equity': fmt(info.get('debtToEquity')),
                 'volume_avg_10d': fmt(info.get('averageVolume10days'))
             })
+            
+            # Add Earnings proximity
+            earnings_date, days_to = self.get_earnings_info(ticker)
+            result['next_earnings'] = earnings_date
+            result['days_to_earnings'] = days_to
+            
             return result
         except Exception as e:
             logger.error(f"Error fetching yfinance financials for {ticker}: {e}")
@@ -451,3 +457,55 @@ FORMAT:
         except Exception as e:
             logger.error(f"Error generating explainable insights for {ticker}: {e}")
             return "⚠️ Technical interpretation failed."
+
+    def get_earnings_info(self, ticker):
+        """Fetch next earnings date and days until it occurs."""
+        try:
+            symbol = yf.Ticker(ticker)
+            calendar = symbol.calendar
+            if not calendar or 'Earnings Date' not in calendar:
+                return "Unknown", 999
+            
+            e_dates = calendar['Earnings Date']
+            if not e_dates:
+                return "Unknown", 999
+            
+            next_e = e_dates[0]
+            if hasattr(next_e, 'date'):
+                next_e = next_e.date()
+                
+            today = datetime.now().date()
+            diff = (next_e - today).days
+            
+            return next_e.strftime('%Y-%m-%d'), diff
+        except Exception as e:
+            logger.error(f"Error fetching earnings for {ticker}: {e}")
+            return "Unknown", 999
+
+    def check_volume_anomaly(self, metrics, performance):
+        """Detect if current volume is a significant anomaly (>2x 10D avg)."""
+        try:
+            curr_vol = performance.get('curr_vol', 0)
+            avg_vol = metrics.get('volume_avg_10d')
+            
+            if not curr_vol or avg_vol == 'N/A':
+                return None
+            
+            # Convert human-readable avg_vol (e.g. 175.0M) back to number
+            multiplier = 1
+            if isinstance(avg_vol, str):
+                if 'B' in avg_vol: multiplier = 1e9
+                elif 'M' in avg_vol: multiplier = 1e6
+                elif 'K' in avg_vol: multiplier = 1e3
+                avg_num = float(avg_vol.replace('B','').replace('M','').replace('K','')) * multiplier
+            else:
+                avg_num = float(avg_vol)
+                
+            if curr_vol > (2.0 * avg_num):
+                ratio = curr_vol / avg_num
+                return f"🚀 <b>VOLUME ANOMALY</b>: Trading at {ratio:.1f}x normal volume. Strong buyer/seller conviction detected."
+            
+            return None
+        except Exception as e:
+            logger.error(f"Error checking volume anomaly: {e}")
+            return None

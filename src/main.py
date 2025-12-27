@@ -160,6 +160,47 @@ class StockMonitorAgent:
                             title=article['headline'][:100]
                         )
                         time.sleep(1)
+
+    def check_intelligence_alerts(self):
+        """Perform Pro Intelligence checks (Volume Anomalies, Earnings)."""
+        logger.info("Performing pro intelligence checks for all monitored tickers...")
+        
+        tickers = self.cache.get_all_monitored_tickers()
+        if not tickers:
+            return
+
+        for ticker in tickers:
+            try:
+                # 1. Fetch data
+                metrics = self.bot_handler.analyzer.get_basic_financials(ticker)
+                perf = self.bot_handler.analyzer.get_performance_metrics(ticker)
+                
+                if not metrics or not perf:
+                    continue
+
+                # 2. Volume Anomaly Check
+                anomaly_text = self.bot_handler.analyzer.check_volume_anomaly(metrics, perf)
+                if anomaly_text:
+                    content_hash = generate_content_hash(f"{ticker}_vol_anomaly_{datetime.now().strftime('%Y-%m-%d')}")
+                    if not self.cache.is_duplicate(content_hash):
+                        subscribers = self.cache.get_subscribers(ticker)
+                        for chat_id in subscribers:
+                            self.telegram.send_anomaly_alert(ticker, metrics.get('name', ticker), anomaly_text, chat_id=chat_id)
+                        self.cache.add_notification(content_hash, ticker, 'anomaly', 'Volume Spike')
+
+                # 3. Earnings Proximity Check
+                days_to = metrics.get('days_to_earnings', 999)
+                if 0 <= days_to <= 7:
+                    content_hash = generate_content_hash(f"{ticker}_earnings_near_{metrics.get('next_earnings')}")
+                    if not self.cache.is_duplicate(content_hash):
+                        subscribers = self.cache.get_subscribers(ticker)
+                        alert_text = f"📅 <b>EARNINGS PROXIMITY</b>: Next earnings on {metrics.get('next_earnings')} ({days_to} days away). Expect heightened volatility."
+                        for chat_id in subscribers:
+                            self.telegram.send_anomaly_alert(ticker, metrics.get('name', ticker), alert_text, chat_id=chat_id)
+                        self.cache.add_notification(content_hash, ticker, 'earnings', 'Earnings Proximity')
+
+            except Exception as e:
+                logger.error(f"Error checking intelligence for {ticker}: {e}")
     
     def run_monitoring_cycle(self):
         """Run a complete monitoring cycle."""
@@ -181,6 +222,9 @@ class StockMonitorAgent:
             
             # Check news updates
             self.check_news_updates()
+
+            # Pro Intelligence Checks (New)
+            self.check_intelligence_alerts()
             
             # Cleanup old cache entries (weekly)
             if datetime.now().hour == 0:  # Run at midnight
