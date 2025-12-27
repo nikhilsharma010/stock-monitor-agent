@@ -151,18 +151,19 @@ class StockAnalyzer:
                 news_context = "\nRecent 60-Day News Headlines:\n" + "\n".join([f"- {h}" for h in headlines])
 
             if question:
-                system_prompt = f"You are a Senior Equity Analyst. Industry: {industry}."
+                system_prompt = f"You are a Senior Equity Analyst. Industry: {industry}. Provide professional, concise answers using bolding for key terms."
                 user_prompt = f"Stock: {ticker}\nMetrics: {metrics_str}\n{price_context}\n{news_context}\n\nQuestion: {question}"
             else:
                 system_prompt = f"You are a Senior Strategic Advisor. Focus: Narrative Tracking & Industry Trends in {industry}."
                 user_prompt = (
                     f"Perform a 'Deep Intelligence' report for {ticker} over the last 60 days.\n\n"
                     f"Data: {metrics_str}\n{price_context}\n{news_context}\n\n"
-                    "Task:\n"
-                    "1. 📈 Narrative Tracking: Identify the main theme/story from the last 60 days of news.\n"
-                    f"2. 🏢 Industry Context: How is this company positioned within {industry} right now?\n"
-                    "3. 🎯 Deep Insight: What is the most critical factor for investors to watch in the next 30 days?\n"
-                    "4. Rating: Buy/Hold/Sell with 1-sentence logic."
+                    "FORMAT INSTRUCTIONS:\n"
+                    "1. Use [NARRATIVE] for theme/story identification.\n"
+                    "2. Use [INDUSTRY] for positioning.\n"
+                    "3. Use [INSIGHT] for the 30-day outlook.\n"
+                    "4. End with '⭐ RATING: [BUY/HOLD/SELL]' followed by a 1-sentence logic.\n"
+                    "Keep descriptions sharp and professional."
                 )
 
             chat_completion = self.client.chat.completions.create(
@@ -200,15 +201,16 @@ Stock 2: {t2}
 - Price: ${q2['current_price']} ({q2['percent_change']}%)
 - 52W Range: ${m2['52_week_low']} - ${m2['52_week_high']}
 """
-            system_prompt = "You are a world-class equity researcher. Compare two stocks and give a clear verdict on which is the better investment right now."
+            system_prompt = "You are a world-class equity researcher. Compare two stocks and give a clear verdict on which is the better investment right now. Use structured headers."
             user_prompt = f"""
 Compare the following two stocks based on the data provided:
 {comparison_context}
 
-Task:
-1. Briefly compare their valuations (P/E) and market positioning.
-2. Analyze their recent price action relative to their 52-week ranges.
-3. Verdict: Which one is a better buy today? Provide a 1-sentence justification.
+FORMAT INSTRUCTIONS:
+1. [VALUATION] Compare metrics and positioning.
+2. [ACTION] Analyze recent price trends relative to ranges.
+3. [VERDICT] State Stock 1 or Stock 2 as the winner.
+4. End with '🏆 WINNER: [TICKER]' followed by a 1-sentence justification.
 """
             chat_completion = self.client.chat.completions.create(
                 messages=[

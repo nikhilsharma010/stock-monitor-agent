@@ -164,22 +164,25 @@ class TelegramBotHandler:
             return "❌ Invalid number. Please provide minutes as a number (e.g., /interval 5)"
     
     def handle_help(self):
-        """Show help message."""
+        """Show help message with professional categorization."""
         return """
-🤖 <b>Stock Monitor Bot</b>
+👨‍💻 <b>STOCK MONITOR COMMAND CENTER</b>
+────────────────────────
+<b>📊 Analysis & Insights</b>
+• /analyse <code>SYM</code> - AI Deep Intelligence
+• /compare <code>S1 S2</code> - Side-by-side verdict
+• /ask <code>SYM Q</code> - Financial Q&A
 
-<b>Commands:</b>
-• /add TICKER - Track a stock
-• /remove TICKER - Stop tracking
-• /list - Show monitored stocks
-• /analyse TICKER - AI Analysis & Rating
-• /compare T1 T2 - Side-by-side comparison
-• /ask TICKER QUESTION - Ask AI anything
-• /status - Show system status
-• /interval MIN - Set check interval
-• /debug - Check API key status
-• /ping - Quick connection test
-• /donate - Support the project ☕️
+<b>📈 Watchlist Management</b>
+• /add <code>SYM</code> - Add to private watchlist
+• /remove <code>SYM</code> - Stop monitoring
+• /list - View your stocks
+
+<b>⚙️ System & Support</b>
+• /status - Health & Usage metrics
+• /interval <code>MIN</code> - Set check frequency
+• /ping - Diagnostic test
+• /donate - Support independent AI ☕️
 """
     
     def handle_donate(self):
@@ -197,7 +200,7 @@ This platform is free and open-source, but running the AI models and infrastruct
 """
     
     def handle_status(self):
-        """Show current status."""
+        """Show current status with clean sections."""
         config = self.load_config()
         if not config:
             return "❌ Failed to load configuration"
@@ -205,26 +208,22 @@ This platform is free and open-source, but running the AI models and infrastruct
         active_stocks = self.cache.get_all_monitored_tickers()
         interval = config.get('monitoring', {}).get('check_interval_minutes', 15)
         threshold = config.get('monitoring', {}).get('price_change_threshold_percent', 0.5)
-        
-        # Get usage metrics
         metrics = self.cache.get_usage_metrics()
         
         return f"""
-📊 <b>System Status</b>
+🖥 <b>SYSTEM TERMINAL STATUS</b>
+────────────────────────
+<b>📡 Monitoring Engine</b>
+• Active Tickers: <code>{len(active_stocks)}</code>
+• Frequency: <code>{interval} min</code>
+• Threshold: <code>{threshold}%</code>
 
-🔹 Multi-user Mode: ✅ Active
-🔹 Total Tickers Monitored: {len(active_stocks)} 
-🔹 Check interval: {interval} minutes
-🔹 Price threshold: {threshold}%
+<b>👥 Platform Growth</b>
+• Total Users: <code>{metrics.get('total_users', 0)}</code>
+• Interactions: <code>{metrics.get('total_commands', 0)}</code>
+• Daily Active: <code>{metrics.get('active_users_24h', 0)}</code>
 
-📈 <b>Usage Metrics</b>
-🔹 Total Users: {metrics.get('total_users', 0)}
-🔹 Total Commands: {metrics.get('total_commands', 0)}
-🔹 Active (24h): {metrics.get('active_users_24h', 0)}
-
-Use /list to see your personal stocks.
-
-☕️ <i>Support this project: /donate</i>
+☕️ Support the Platform: /donate
 """
 
     def handle_analyse(self, ticker, chat_id):
@@ -251,16 +250,24 @@ Use /list to see your personal stocks.
             commentary = self.analyzer.get_ai_commentary(ticker, metrics, quote, news=news, profile=profile)
             
             # Format report
+            name = profile.get('name', ticker)
             industry = profile.get('finnhubIndustry', 'N/A')
             sector = profile.get('finnhubSector', 'N/A')
             
             report = (
-                f"🧠 <b>60-Day Intelligence: {ticker}</b>\n"
-                f"<i>{profile.get('name', ticker)} | Sector: {sector}</i>\n\n"
-                f"💰 <b>Metrics:</b>\n"
-                f"• P/E: {metrics['pe_ratio']} | Cap: {metrics['market_cap']}M\n"
-                f"• Range: ${metrics['52_week_low']} - ${metrics['52_week_high']}\n\n"
-                f"<b>Deep Analysis:</b>\n{commentary}"
+                f"🧠 <b>DEEP INTELLIGENCE: {ticker}</b>\n"
+                f"<i>{name} | {industry}</i>\n"
+                f"────────────────────────\n"
+                f"<b>📊 TECHNICAL METRICS</b>\n"
+                f"<code>"
+                f"Price: ${quote['current_price']:,.2f} ({quote['percent_change']:+.2f}%)\n"
+                f"P/E:   {metrics['pe_ratio']}\n"
+                f"Cap:   {metrics['market_cap']}M\n"
+                f"Range: ${metrics['52_week_low']} - ${metrics['52_week_high']}"
+                f"</code>\n\n"
+                f"<b>⚡️ STRATEGIC ANALYSIS</b>\n"
+                f"{commentary}\n"
+                f"────────────────────────"
             )
             return report
             
@@ -309,14 +316,25 @@ Use /list to see your personal stocks.
             m2 = self.analyzer.get_basic_financials(t2)
             q2 = self.analyzer.get_stock_quote(t2)
             
-            if not m1 or not m2:
-                return f"❌ Failed to fetch data for one of the symbols: {t1} or {t2}."
-
             # Use analyzer to get comparison commentary
-            # We'll create a special method for this in analyzer.py next
             commentary = self.analyzer.get_ai_comparison(t1, m1, q1, t2, m2, q2)
             
-            return f"⚖️ <b>Stock Comparison: {t1} vs {t2}</b>\n\n{commentary}"
+            report = (
+                f"⚖️ <b>COMPARISON: {t1} vs {t2}</b>\n"
+                f"────────────────────────\n"
+                f"<b>📊 DATA GRID</b>\n"
+                f"<code>"
+                f"METRIC      {t1:<8} {t2:<8}\n"
+                f"PRICE       {q1['current_price']:<8.2f} {q2['current_price']:<8.2f}\n"
+                f"CHG%        {q1['percent_change']:<8.2f} {q2['percent_change']:<8.2f}\n"
+                f"P/E         {str(m1['pe_ratio']):<8} {str(m2['pe_ratio']):<8}\n"
+                f"CAP(M)      {str(m1['market_cap']):<8} {str(m2['market_cap']):<8}"
+                f"</code>\n\n"
+                f"<b>💡 AI VERDICT</b>\n"
+                f"{commentary}\n"
+                f"────────────────────────"
+            )
+            return report
             
         except Exception as e:
             logger.error(f"Error in handle_compare: {e}")
