@@ -166,9 +166,10 @@ class StockAnalyzer:
                     f"You are a Senior Strategic Advisor. Industry: {industry}.\n"
                     "CORE RULES:\n"
                     "1. FIRST PRINCIPLES: Analyze the narrative based on structural drivers, not just price.\n"
-                    "2. STRICT BULLETS: Use only bullet points for all sections. No paragraphs.\n"
-                    "3. ZERO HALLUCINATION: If a metric is 'N/A', do not interpret it. Say 'Insufficient Data'.\n"
-                    "4. OPERATOR UX: Be concise. Max 150 words total."
+                    "2. MACRO CONTEXT: Consider how industry-wide trends or macro shifts (rates, regulation) impact this specific ticker.\n"
+                    "3. STRICT BULLETS: Use only bullet points for all sections. No paragraphs.\n"
+                    "4. ZERO HALLUCINATION: If a metric is 'N/A', do not interpret it. Say 'Insufficient Data'.\n"
+                    "5. OPERATOR UX: Be concise. Max 180 words total."
                 )
                 user_prompt = (
                     f"Perform a 'Deep Intelligence' report for {ticker} over the last 60 days.\n\n"
@@ -176,6 +177,8 @@ class StockAnalyzer:
                     "FORMAT:\n"
                     "• [SUMMARY] Primary 60-day narrative.\n"
                     "• [DRIVERS] List 2-3 key fundamental/market drivers.\n"
+                    "• [RISKS] Critical red flags or things to watch out for.\n"
+                    "• [INDUSTRY] Major sector/macro developments impacting {ticker}.\n"
                     "• [OUTLOOK] What to watch in the next 30 days.\n"
                     "• [RATING] ⭐ ⭐ ⭐ [BUY/HOLD/SELL] - 1-sentence logic."
                 )
