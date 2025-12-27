@@ -378,15 +378,71 @@ FORMAT:
             ax2.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
             fig.autofmt_xdate()
             
-            # 5. Export to Buffer
+            # 5. Extract Context for AI Insights
+            latest = df.iloc[-1]
+            prev = df.iloc[-2] if len(df) > 1 else latest
+            
+            tech_context = {
+                'price': latest['Close'],
+                'dma20': latest['DMA20'],
+                'dma50': latest['DMA50'],
+                'dma200': latest['DMA200'],
+                'rsi': latest['RSI'],
+                'trend_1d': ((latest['Close'] / prev['Close']) - 1) * 100 if len(df) > 1 else 0
+            }
+
+            # 6. Export to Buffer
             buf = io.BytesIO()
             plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
             buf.seek(0)
             plt.close(fig)
             
-            return buf, None
+            return buf, tech_context
             
         except Exception as e:
             logger.error(f"Error generating yfinance chart for {ticker}: {e}")
             plt.close('all')
             return None, f"Data fetch error: {str(e)}"
+
+    def get_ai_technical_insights(self, ticker, context):
+        """Generate a concise AI interpretation of technical signals."""
+        if not self.client: return "AI technical analysis is currently unavailable."
+        
+        try:
+            # Prepare readable context
+            p = context['price']
+            d20 = context['dma20']
+            d50 = context['dma50']
+            d200 = context['dma200']
+            rsi = context['rsi']
+            
+            system_prompt = (
+                "You are a Chartered Market Technician (CMT). "
+                "Analyze the provided technical data and give a high-density, professional interpretation. "
+                "Rules: 1. Max 80 words. 2. Use bullet points. 3. Focus on trend and momentum signals."
+            )
+            
+            data_str = (
+                f"Ticker: {ticker}\n"
+                f"Price: ${p:.2f}\n"
+                f"DMA20: {f'{d20:.2f}' if pd.notnull(d20) else 'N/A'}\n"
+                f"DMA50: {f'{d50:.2f}' if pd.notnull(d50) else 'N/A'}\n"
+                f"DMA200: {f'{d200:.2f}' if pd.notnull(d200) else 'N/A'}\n"
+                f"RSI(14): {f'{rsi:.1f}' if pd.notnull(rsi) else 'N/A'}"
+            )
+            
+            user_prompt = f"Data:\n{data_str}\n\nProvide the 'Technical Verdict' (Trend, Support/Resistance, and Momentum)."
+
+            completion = self.client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                model=self.model,
+                temperature=0.2,
+                max_tokens=250
+            )
+            return completion.choices[0].message.content
+        except Exception as e:
+            logger.error(f"Error generating technical insights for {ticker}: {e}")
+            return "⚠️ Technical interpretation failed."

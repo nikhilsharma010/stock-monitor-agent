@@ -352,14 +352,24 @@ This platform is free and open-source, but running the AI models and infrastruct
         self.send_message(f"📊 <b>Generating technical chart for {ticker}...</b>", chat_id=chat_id)
         
         try:
-            chart_buf, error_reason = self.analyzer.get_stock_chart(ticker)
+            chart_buf, tech_context = self.analyzer.get_stock_chart(ticker)
             if not chart_buf:
-                return f"❌ Failed to generate chart for {ticker}.\nReason: {error_reason or 'Internal Error'}"
+                return f"❌ Failed to generate chart for {ticker}.\nReason: {tech_context or 'Internal Error'}"
+            
+            # Fetch AI technical insights
+            insights = self.analyzer.get_ai_technical_insights(ticker, tech_context)
             
             # Use telegram_notifier.send_photo
+            caption = (
+                f"📈 <b>Technical Analysis: {ticker}</b>\n"
+                f"────────────────────────\n"
+                f"{insights}\n\n"
+                f"<i>Indicators: DMA 20/50/200 + RSI(14)</i>"
+            )
+            
             success = self.telegram_notifier.send_photo(
                 chart_buf, 
-                caption=f"📈 <b>Technical Analysis: {ticker}</b>\n• SMAs: 20(Green), 50(Orange), 200(Red)\n• RSI(14) in purple",
+                caption=caption,
                 chat_id=chat_id
             )
             
