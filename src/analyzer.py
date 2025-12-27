@@ -278,6 +278,57 @@ class StockAnalyzer:
             logger.error(f"Error generating AI deep commentary for {ticker}: {str(e)}")
             return f"⚠️ AI deep analysis failed: {str(e)}"
 
+    def get_ai_why_interpretation(self, ticker, metrics, quote, news=None, profile=None, performance=None):
+        """Ultra-compressed interpretation of recent moves."""
+        if not self.client:
+            self.groq_api_key = self._find_groq_key()
+            if self.groq_api_key:
+                self.client = Groq(api_key=self.groq_api_key)
+            else:
+                return "AI analysis disabled."
+
+        try:
+            # High-density context for 'Why'
+            price = quote.get('current_price', 'N/A')
+            chg = quote.get('percent_change', 'N/A')
+            p5d = performance.get('5d_pct', 'N/A') if performance else 'N/A'
+            p5d_str = f"{p5d:+.2f}%" if isinstance(p5d, (int, float)) else str(p5d)
+            
+            headlines = [n['headline'] for n in news[:8]] if news else []
+            news_str = "\n".join([f"- {h}" for h in headlines])
+            
+            industry = profile.get('finnhubIndustry', 'N/A') if profile else "N/A"
+
+            system_prompt = (
+                f"You are a Market Strategist. Analyze {ticker} ({industry}).\n"
+                "TASK: Identify the single most likely driver for 1D or 5D performance.\n"
+                "RULES: 1. Max 80 words. 2. No filler. 3. Be direct. 4. Bullet points only."
+            )
+            user_prompt = (
+                f"TICKER: {ticker}\n"
+                f"1D MOVE: {chg:+.2f}%\n"
+                f"5D MOVE: {p5d_str}\n"
+                f"RECENT NEWS:\n{news_str}\n\n"
+                "Provide 'The Move' analysis in this format:\n"
+                "🔍 <b>THE MOVE</b>: [1-line narrative]\n"
+                "⚙️ <b>PRIMARY DRIVERS</b>:\n• [Bullet 1]\n• [Bullet 2]\n"
+                "🎯 <b>WHAT TO WATCH</b>:\n• [1-line next level]"
+            )
+
+            completion = self.client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                model=self.model,
+                temperature=0.2,
+                max_tokens=300
+            )
+            return completion.choices[0].message.content
+        except Exception as e:
+            logger.error(f"Error in 'why' interpretation for {ticker}: {e}")
+            return f"⚠️ Analysis failed: {e}"
+
     def get_ai_comparison(self, t1, m1, q1, t2, m2, q2):
         """Generate a side-by-side AI comparison of two stocks."""
         if not self.client:

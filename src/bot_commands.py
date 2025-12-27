@@ -168,9 +168,10 @@ class TelegramBotHandler:
         return """
 👨‍💻 <b>STOCK MONITOR COMMAND CENTER</b>
 ────────────────────────
-<b>📊 Analysis & Insights</b>
-• /analyse <code>SYM</code> - AI Deep Intelligence
-• /compare <code>S1 S2</code> - Side-by-side verdict
+<b>📊 MARKET CONTEXT</b>
+• /snapshot TICKER - Multi-timeframe deep report (Alias: /analyse)
+• /why TICKER - Instant narrative: why it moved
+• /compare T1 T2 - Side-by-side strategic analysis
 • /ask <code>SYM Q</code> - Financial Q&A
 
 <b>📈 Watchlist Management</b>
@@ -340,6 +341,50 @@ This platform is free and open-source, but running the AI models and infrastruct
             logger.error(f"Error in handle_ask: {e}", exc_info=True)
             return f"❌ Failed to get AI answer: {str(e)}"
     
+    def handle_why(self, args, chat_id):
+        """Ultra-compressed 'Why it moved' report."""
+        if not args:
+            return "❌ Usage: /why TICKER\nExample: /why NVDA"
+        
+        ticker = args.upper().strip()
+        self.send_message(f"🕵️‍♂️ <b>Decoding recent moves for {ticker}...</b>", chat_id=chat_id)
+        
+        try:
+            # 1. Fetch Context
+            quote = self.analyzer.get_stock_quote(ticker)
+            metrics = self.analyzer.get_basic_financials(ticker)
+            profile = self.analyzer.get_company_profile(ticker)
+            performance = self.analyzer.get_performance_metrics(ticker)
+            
+            from news_monitor import NewsMonitor
+            news_mon = NewsMonitor()
+            news = news_mon.get_company_news(ticker, days_back=60)
+            
+            # 2. Get AI Interpretation
+            interpretation = self.analyzer.get_ai_why_interpretation(
+                ticker, metrics, quote, news=news, profile=profile, performance=performance
+            )
+            
+            # Helper for indicators
+            def get_dir(val):
+                if isinstance(val, (int, float)):
+                    return "🟢" if val > 0 else "🔴" if val < 0 else "⚪️"
+                return "⚪️"
+
+            m1d = get_dir(quote.get('percent_change', 0))
+            
+            report = (
+                f"⚡️ <b>QUICK NARRATIVE: {ticker}</b>\n"
+                f"Price: ${quote['current_price']:,.2f} ({m1d} {quote['percent_change']:+.2f}%)\n"
+                f"────────────────────────\n"
+                f"{interpretation}\n"
+                f"────────────────────────"
+            )
+            return report
+        except Exception as e:
+            logger.error(f"Error in handle_why: {e}", exc_info=True)
+            return f"❌ Failed to decode moves: {str(e)}"
+    
     def handle_compare(self, args, chat_id):
         """Compare two stock tickers."""
         tickers = args.upper().strip().split()
@@ -443,10 +488,12 @@ This platform is free and open-source, but running the AI models and infrastruct
                 return self.handle_set_interval(args)
             elif command == '/status':
                 return self.handle_status()
-            elif command == '/analyse' or command == '/analyze' or command == '/snapshot':
+            elif command == '/snapshot' or command == '/analyse' or command == '/analyze':
                 if not args:
                     return "❌ Usage: /snapshot TICKER\nExample: /snapshot AAPL"
                 return self.handle_analyse(args, chat_id)
+            elif command == '/why':
+                return self.handle_why(args, chat_id)
             elif command == '/ask':
                 if not args:
                     return "❌ Usage: /ask TICKER QUESTION\nExample: /ask CCCC What does this company do?"
