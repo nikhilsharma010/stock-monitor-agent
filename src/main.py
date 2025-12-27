@@ -254,11 +254,17 @@ def main():
     print("="*60)
     print()
     
-    # Check for .env file
-    if not os.path.exists('.env'):
-        print("⚠️  No .env file found!")
-        print("Please create a .env file with your API credentials.")
-        print("See .env.example for reference.")
+    # Load .env if it exists (local dev), but don't fail if missing (cloud dev)
+    load_dotenv()
+    
+    # Required variables
+    required_vars = ['FINNHUB_API_KEY', 'TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID']
+    missing_vars = [var for var in required_vars if not os.getenv(var)]
+    
+    if missing_vars:
+        print(f"❌ Missing required environment variables: {', '.join(missing_vars)}")
+        if not os.path.exists('.env'):
+            print("No .env file found and system environment variables are not set.")
         return
     
     try:

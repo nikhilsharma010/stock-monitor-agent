@@ -305,10 +305,6 @@ Use /list to see all stocks
         """Check for new commands and handle them."""
         updates = self.get_updates()
         
-        # Track startup time to ignore backlog
-        if not hasattr(self, '_started_at'):
-            self._started_at = time.time()
-        
         for update in updates:
             self.last_update_id = update['update_id']
             
@@ -317,11 +313,6 @@ Use /list to see all stocks
             
             message = update['message']
             chat_id = str(message['chat'].get('id'))
-            
-            # Ignore messages sent before the bot started (backlog)
-            msg_date = message.get('date', 0)
-            if msg_date < self._started_at - 10:  # 10s buffer
-                continue
             
             # Log the chat ID for debugging if it doesn't match
             if chat_id != str(self.chat_id):
