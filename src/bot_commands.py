@@ -12,8 +12,12 @@ from analyzer import StockAnalyzer
 
 class TelegramBotHandler:
     """Handles incoming Telegram commands for managing stocks and settings."""
-    
     FINANCIAL_DISCLAIMER = "\n\n⚠️ <b>Disclaimer</b>: <i>This report is AI-generated for informational purposes only. Not financial advice. Always consult a certified professional before trading.</i>"
+
+    BOT_HEADER = """
+<b>ALPHA INTELLIGENCE v4.0</b>
+────────────────────────
+"""
 
     def __init__(self, bot_token=None, chat_id=None, config_path='config/stocks.json', cache=None, notifier=None):
         self.bot_token = bot_token or os.getenv('TELEGRAM_BOT_TOKEN')
@@ -175,26 +179,30 @@ class TelegramBotHandler:
     
     def handle_help(self):
         """Show help message with professional categorization."""
-        return """
-👨‍💻 <b>STOCK MONITOR COMMAND CENTER</b>
-────────────────────────
-<b>📊 MARKET CONTEXT</b>
-• /snapshot TICKER - Multi-timeframe deep report (Alias: /analyse)
-• /chart TICKER - Technical analysis chart (DMA + RSI)
-• /why TICKER - Instant narrative: why it moved
-• /compare T1 T2 - Side-by-side strategic analysis
-• /ask <code>SYM Q</code> - Financial Q&A
+        return self.BOT_HEADER + """
+<b>📊 MARKET INTELLIGENCE</b>
+• /snapshot TICKER - Multi-timeframe deep report
+• /chart TICKER - DMA + RSI technical visualization
+• /why TICKER - Instant news narrative & drivers
+• /compare T1 T2 - Strategic side-by-side analysis
+• /ask <code>SYM Q</code> - Real-time financial Q&A
 
-<b>📈 Watchlist Management</b>
-• /add <code>SYM</code> - Add to private watchlist
-• /remove <code>SYM</code> - Stop monitoring
-• /list - View your stocks
+<b>🎯 STRATEGIC ADVISOR</b>
+• /premarket - Personalized morning Alpha Brief
+• /undervalued - AI-picked growth & value gems
+• /sectors - Live Sector Rotation heat-map
+• /risk - Map your investor DNA persona
 
-<b>⚙️ System & Support</b>
-• /status - Health & Usage metrics
-• /interval <code>MIN</code> - Set check frequency
-• /ping - Diagnostic test
-• /donate - Support independent AI ☕️
+<b>📈 WATCHLIST OPS</b>
+• /add <code>SYM</code> - Register for automated monitoring
+• /remove <code>SYM</code> - Unregister ticker
+• /list - View your active terminals
+
+<b>⚙️ SYSTEM</b>
+• /status - Network & usage health
+• /interval - Adjust scan frequency
+• /start - Restart Concierge onboarding
+• /donate - Support the Alpha Platform ☕️
 """
     
     def handle_donate(self):
@@ -680,8 +688,10 @@ This platform is free and open-source, but running the AI models and infrastruct
         trends = self.analyzer.get_sector_trends()
         if not trends: return "❌ Failed to fetch sector data."
         
-        lines = ["🏁 <b>SECTOR ROTATION (Last 24h)</b>\n"]
+        lines = [self.BOT_HEADER + "<b>🏁 SECTOR ROTATION TERMINAL</b>\n"]
         lines.append("<code>")
+        lines.append(f"{'SECTOR':<18} {'CHG%':>8}")
+        lines.append("─" * 27)
         for t in trends:
             lines.append(f"{t['name']:<18} {t['change']:>+7.2f}%")
         lines.append("</code>")

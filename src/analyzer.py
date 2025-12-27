@@ -661,13 +661,21 @@ FORMAT:
 
             system_prompt = (
                 "You are an Institutional Value & Growth Strategist.\n"
-                "TASK: Identify the TOP 2 'Best Buys' from the provided list based on 'Undervaluation' and 'Upside Potential'.\n"
-                "FORMAT: Bullet points. Header [TICKER] - Reasoning."
+                "TASK: Identify the TOP 2 'Best Buys' from the provided list.\n"
+                "RULES: 1. Use <b>bold</b> for Tickers and Headers.\n"
+                "2. Provide a 'Thesis' for each pick.\n"
+                "3. Use a structured, information-dense layout.\n"
+                "4. Be authoritative and precise."
             )
             
-            data_summary = ""
+            data_summary = "<code>\n"
+            data_summary += f"{'TKN':<6} {'P/E':>6} {'GROWTH':>8} {'PRICE':>8}\n"
+            data_summary += "─" * 30 + "\n"
             for c in candidates:
-                data_summary += f"{c['ticker']}: P/E {c['metrics']['pe_ratio']}, Growth {c['metrics']['revenue_growth']}%, Price ${c['quote']['current_price']}\n"
+                pe = f"{c['metrics']['pe_ratio']}" if c['metrics']['pe_ratio'] != 'N/A' else 'N/A'
+                gr = f"{c['metrics']['revenue_growth']}%" if c['metrics']['revenue_growth'] != 'N/A' else 'N/A'
+                data_summary += f"{c['ticker']:<6} {pe:>6} {gr:>8} {c['quote']['current_price']:>8.2f}\n"
+            data_summary += "</code>"
             
             completion = self.client.chat.completions.create(
                 messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": data_summary}],
@@ -722,9 +730,9 @@ FORMAT:
                 "TASK: Provide a Pre-Market 'Strategic Briefing'.\n"
                 "STRUCTURE:\n"
                 "1. 🏛️ STATE OF THE MARKET: Briefly interpret sector rotation.\n"
-                "2. 🏹 TACTICAL OPS (Today's Money): Short-term sector/stock picks with high momentum/volume.\n"
-                "3. 💎 STRATEGIC WEALTH (Future Money): Long-term structural trends (e.g. AI, Green Energy, Infrastructure) and value setups.\n"
-                "RULES: Be sharp, expert-toned, and use bolding for impact."
+                "2. 🏹 TACTICAL OPS: High-momentum setups for today.\n"
+                "3. 💎 STRATEGIC WEALTH: Structural trends for long-term compounding.\n"
+                "RULES: Use bold headers. Use bullet points. Be high-velocity and expert-toned."
             )
             
             user_prompt = (
