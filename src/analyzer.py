@@ -8,6 +8,7 @@ import time
 from datetime import datetime, timedelta
 import io
 import pandas as pd
+import yfinance as yf
 import matplotlib
 matplotlib.use('Agg') # Headless support
 import matplotlib.pyplot as plt
@@ -330,60 +331,22 @@ FORMAT:
             return f"⚠️ AI Comparison failed: {str(e)}"
 
     def get_stock_chart(self, ticker, days=180):
-        """Generate a technical chart with DMA and RSI overlays."""
+        """Generate a technical chart with DMA and RSI overlays using yfinance."""
         try:
-            # 1. Fetch historical candles
-            end = int(time.time())
-            start = end - (days * 24 * 60 * 60)
+            # 1. Fetch historical data via yfinance (Reliable Alternate)
+            symbol = yf.Ticker(ticker)
+            # 6 months is roughly 180 days
+            df = symbol.history(period="6mo")
             
-            url = f"{self.finnhub_base_url}/stock/candle"
-            params = {
-                'symbol': ticker,
-                'resolution': 'D',
-                'from': start,
-                'to': end,
-                'token': self.finnhub_api_key
-            }
+            if df.empty:
+                logger.error(f"yfinance returned empty data for {ticker}")
+                return None, f"No data found for symbol '{ticker}'. It might be invalid or delisted."
             
-            response = requests.get(url, params=params, timeout=10)
-            
-            # Diagnostic: Improved error handling
-            if response.status_code != 200:
-                error_body = response.text
-                logger.error(f"Finnhub HTTP {response.status_code} for {ticker}: {error_body}")
-                if response.status_code == 429:
-                    return None, "Finnhub API limit reached for charts. Please try again in 1 minute."
-                if response.status_code == 401:
-                    return None, "Finnhub API key is unauthorized for historical candle data."
-                return None, f"HTTP {response.status_code}: {error_body[:100]}"
-
-            data = response.json()
-            
-            if data.get('s') != 'ok':
-                reason = data.get('s') or data.get('error') or 'Unknown reason'
-                error_msg = f"Finnhub API: {reason}"
-                
-                if reason == 'no_data':
-                    error_msg = "No historical data found for this symbol in the requested timeframe."
-                elif 'limit' in str(reason).lower():
-                    error_msg = "Finnhub API limit reached (Daily candle quota)."
-                
-                logger.error(f"Finnhub Candle Error for {ticker}: {reason}. Data: {data}")
-                return None, error_msg
-            
-            # 2. Prepare Dataframe
-            df = pd.DataFrame({
-                'Date': pd.to_datetime(data['t'], unit='s'),
-                'Close': data['c'],
-                'Open': data['o'],
-                'High': data['h'],
-                'Low': data['l'],
-                'Volume': data['v']
-            })
-            df.set_index('Date', inplace=True)
+            # 2. Extract and format (yfinance already returns a clean DataFrame)
+            # Ensure index is datetime
+            df.index = pd.to_datetime(df.index)
             
             # 3. Calculate Indicators
-            # (Calculation logic remains the same...)
             df['DMA20'] = df['Close'].rolling(window=20).mean()
             df['DMA50'] = df['Close'].rolling(window=50).mean()
             df['DMA200'] = df['Close'].rolling(window=200).mean()
@@ -433,6 +396,6 @@ FORMAT:
             return buf, None
             
         except Exception as e:
-            logger.error(f"Error generating chart for {ticker}: {e}")
+            logger.error(f"Error generating yfinance chart for {ticker}: {e}")
             plt.close('all')
-            return None, str(e)
+            return None, f"Data fetch error: {str(e)}"
