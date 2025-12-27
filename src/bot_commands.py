@@ -3,6 +3,7 @@ Telegram bot command handler for interactive stock management.
 """
 import os
 import json
+import time
 import requests
 from utils import logger
 from analyzer import StockAnalyzer
@@ -298,6 +299,10 @@ Use /list to see all stocks
         """Check for new commands and handle them."""
         updates = self.get_updates()
         
+        # Track startup time to ignore backlog
+        if not hasattr(self, '_started_at'):
+            self._started_at = time.time()
+        
         for update in updates:
             self.last_update_id = update['update_id']
             
@@ -305,9 +310,16 @@ Use /list to see all stocks
                 continue
             
             message = update['message']
+            chat_id = str(message['chat'].get('id'))
             
-            # Only process messages from the configured chat
-            if str(message['chat']['id']) != str(self.chat_id):
+            # Ignore messages sent before the bot started (backlog)
+            msg_date = message.get('date', 0)
+            if msg_date < self._started_at - 10:  # 10s buffer
+                continue
+            
+            # Log the chat ID for debugging if it doesn't match
+            if chat_id != str(self.chat_id):
+                logger.warning(f"Ignoring message from unauthorized Chat ID: {chat_id}. Your configured ID is: {self.chat_id}")
                 continue
             
             # Only process text messages
@@ -326,8 +338,12 @@ Use /list to see all stocks
     def start_polling(self):
         """Start a continuous loop to check for commands (for background thread)."""
         logger.info("Bot command polling started (Background Thread)")
+        count = 0
         while True:
             try:
+                count += 1
+                if count % 10 == 0:  # Heartbeat every ~5 mins (assuming 30s long polling)
+                    logger.info("Bot polling heartbeat: background thread is alive and listening.")
                 self.check_and_handle_commands()
             except Exception as e:
                 logger.error(f"Error in bot polling loop: {e}")
