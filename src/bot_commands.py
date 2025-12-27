@@ -30,19 +30,29 @@ class TelegramBotHandler:
             from telegram_notifier import TelegramNotifier
             self.telegram_notifier = TelegramNotifier(bot_token=self.bot_token, chat_id=self.chat_id)
         
-        # Force clear webhook and set offset to ignore old messages
+        # Identify bot and clear webhooks
         try:
+            # Identify
+            me_resp = requests.get(f"{self.api_url}/getMe", timeout=10)
+            if me_resp.ok:
+                bot_info = me_resp.json().get('result', {})
+                logger.info(f"Bot authenticated as @{bot_info.get('username')} (ID: {bot_info.get('id')})")
+            
+            # Reset
             requests.get(f"{self.api_url}/deleteWebhook", timeout=10)
-            # Initial poll with offset -1 to acknowledge all old messages and get current state
+            
+            # Sync update_id to current state
             resp = requests.get(f"{self.api_url}/getUpdates", params={'offset': -1, 'limit': 1}, timeout=10)
             if resp.ok:
                 data = resp.json()
-                if data.get('result'):
-                    self.last_update_id = data['result'][0]['update_id']
-                    logger.info(f"Bot command handler: Backlog cleared. Starting from update {self.last_update_id}")
-            logger.info("Bot command handler: Ready for new messages.")
+                result = data.get('result', [])
+                if result:
+                    self.last_update_id = result[0]['update_id']
+                    logger.info(f"Synchronized update_id: {self.last_update_id}")
+            
+            logger.info("Bot command handler: Startup sync complete.")
         except Exception as e:
-            logger.debug(f"Non-critical failure clearing backlog: {e}")
+            logger.error(f"Critical error during bot startup sync: {e}")
         
     def load_config(self):
         """Load current configuration."""
@@ -367,44 +377,49 @@ Use /list to see your personal stocks.
             return f"❌ An internal error occurred while processing your command: {str(e)}"
     
     def check_and_handle_commands(self):
-        """Check for new commands and handle them."""
+        """Check for new commands and handle them with strict state tracking."""
         updates = self.get_updates()
         
         for update in updates:
-            self.last_update_id = update['update_id']
+            # Update state immediately to mark as received
+            current_update_id = update['update_id']
+            self.last_update_id = current_update_id
             
             if 'message' not in update:
                 continue
             
             message = update['message']
             chat_id = message['chat'].get('id')
+            user = message.get('from', {})
+            user_id = user.get('id')
+            username = user.get('username', 'N/A')
             
             # Only process text messages
             if 'text' not in message:
                 continue
             
             text = message['text']
-            
-            # Only process commands (starting with /)
             if not text.startswith('/'):
                 continue
             
-            # Log user command for analytics
-            user = message.get('from', {})
-            user_id = user.get('id')
-            username = user.get('username', 'N/A')
-            first_name = user.get('first_name', 'N/A')
+            logger.info(f"📥 COMMAND RECEIVED: '{text}' from @{username} (Chat: {chat_id})")
             
-            # Extract command for logging
-            parts = text.strip().split(maxsplit=1)
-            cmd_name = parts[0].lower()
-            cmd_args = parts[1] if len(parts) > 1 else ''
-            
-            self.cache.log_user_command(user_id, username, first_name, cmd_name, cmd_args)
-            
-            logger.info(f"Processing command: {text} from user {username}")
-            response = self.process_command(text, user_id, chat_id)
-            self.send_message(response, chat_id=chat_id)
+            try:
+                # Log for analytics
+                first_name = user.get('first_name', 'N/A')
+                parts = text.strip().split(maxsplit=1)
+                cmd_name = parts[0].lower()
+                cmd_args = parts[1] if len(parts) > 1 else ''
+                self.cache.log_user_command(user_id, username, first_name, cmd_name, cmd_args)
+                
+                # Process and Reply
+                response = self.process_command(text, user_id, chat_id)
+                if response:
+                    self.send_message(response, chat_id=chat_id)
+                    logger.info(f"📤 REPLY SENT to @{username}")
+            except Exception as e:
+                logger.error(f"Error processing command '{text}': {e}", exc_info=True)
+                self.send_message(f"❌ Sorry, an error occurred: {str(e)}", chat_id=chat_id)
     def start_polling(self):
         """Start a continuous loop to check for commands (for background thread)."""
         logger.info("Bot command polling started (Background Thread)")
