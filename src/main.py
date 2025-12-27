@@ -206,12 +206,12 @@ class StockMonitorAgent:
             "Use /help to see all commands."
         )
         
-        # Run immediately on startup
-        self.run_monitoring_cycle()
-        
         # Start bot command polling in a background thread for instant response
         bot_thread = threading.Thread(target=self.bot_handler.start_polling, daemon=True)
         bot_thread.start()
+        
+        # Run immediately on startup
+        self.run_monitoring_cycle()
         
         # Schedule periodic checks - will be updated dynamically
         schedule.clear()
