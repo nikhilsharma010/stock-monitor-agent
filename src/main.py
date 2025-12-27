@@ -197,13 +197,14 @@ class StockMonitorAgent:
         logger.info("Starting scheduled monitoring")
         logger.info(f"Monitoring stocks: {', '.join([s['ticker'] for s in self.stocks if s.get('enabled', True)])}")
         
-        # Send startup notification
-        active_tickers = [s['ticker'] for s in self.stocks if s.get('enabled', True)]
-        self.telegram.send_message(
-            "🚀 <b>Stock Monitor is LIVE!</b>\n\n"
-            f"Currently tracking: {', '.join(active_tickers)}\n"
-            "Use /help to see all commands."
-        )
+        if active_tickers and self.telegram.chat_id:
+            self.telegram.send_message(
+                "🚀 <b>Stock Monitor is LIVE!</b>\n\n"
+                f"Currently tracking: {', '.join(active_tickers)}\n"
+                "Use /help to see all commands."
+            )
+        else:
+            logger.info("Skipping startup message (no default chat_id set).")
         
         # Start bot command polling in a background thread for instant response
         bot_thread = threading.Thread(target=self.bot_handler.start_polling, daemon=True)
@@ -264,7 +265,7 @@ def main():
         logger.info(f"Startup Check: {var} is {status} ({masked if val else '---'})")
     
     # Required variables
-    required_vars = ['FINNHUB_API_KEY', 'TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID']
+    required_vars = ['FINNHUB_API_KEY', 'TELEGRAM_BOT_TOKEN']
     missing_vars = [var for var in required_vars if not os.getenv(var)]
     
     if missing_vars:
