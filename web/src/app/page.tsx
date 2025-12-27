@@ -1,7 +1,11 @@
 import Link from 'next/link'
 import { ArrowRight, BarChart3, Target, Brain, TrendingUp } from 'lucide-react'
+import { currentUser } from '@clerk/nextjs/server'
+import { UserButton } from '@clerk/nextjs'
 
-export default function Home() {
+export default async function Home() {
+  const user = await currentUser()
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
       {/* Navigation */}
@@ -13,12 +17,23 @@ export default function Home() {
               <span className="text-xl font-bold text-white">Alpha Intelligence</span>
             </div>
             <div className="flex items-center space-x-4">
-              <Link href="/sign-in" className="text-gray-300 hover:text-white transition">
-                Sign In
-              </Link>
-              <Link href="/sign-up" className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition">
-                Sign Up
-              </Link>
+              {user ? (
+                <>
+                  <Link href="/dashboard" className="text-gray-300 hover:text-white transition">
+                    Dashboard
+                  </Link>
+                  <UserButton afterSignOutUrl="/" />
+                </>
+              ) : (
+                <>
+                  <Link href="/sign-in" className="text-gray-300 hover:text-white transition">
+                    Sign In
+                  </Link>
+                  <Link href="/sign-up" className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition">
+                    Sign Up
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -37,13 +52,22 @@ export default function Home() {
             Build investment theses. Track financial goals. Make smarter decisions with AI-powered insights for both US and Indian markets.
           </p>
           <div className="flex justify-center space-x-4">
-            <Link href="/sign-up" className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-lg font-semibold flex items-center space-x-2 transition">
-              <span>Get Started Free</span>
-              <ArrowRight className="h-5 w-5" />
-            </Link>
-            <Link href="#features" className="border border-slate-700 hover:border-slate-600 text-white px-8 py-4 rounded-lg font-semibold transition">
-              Learn More
-            </Link>
+            {user ? (
+              <Link href="/dashboard" className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-lg font-semibold flex items-center space-x-2 transition">
+                <span>Go to Dashboard</span>
+                <ArrowRight className="h-5 w-5" />
+              </Link>
+            ) : (
+              <>
+                <Link href="/sign-up" className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-lg font-semibold flex items-center space-x-2 transition">
+                  <span>Get Started Free</span>
+                  <ArrowRight className="h-5 w-5" />
+                </Link>
+                <Link href="#features" className="border border-slate-700 hover:border-slate-600 text-white px-8 py-4 rounded-lg font-semibold transition">
+                  Learn More
+                </Link>
+              </>
+            )}
           </div>
         </div>
 
@@ -88,10 +112,17 @@ export default function Home() {
           <p className="text-indigo-100 mb-8 text-lg">
             Join thousands of investors making smarter decisions with Alpha Intelligence.
           </p>
-          <Link href="/sign-up" className="bg-white text-indigo-600 hover:bg-gray-100 px-8 py-4 rounded-lg font-semibold inline-flex items-center space-x-2 transition">
-            <span>Start Your Free Trial</span>
-            <ArrowRight className="h-5 w-5" />
-          </Link>
+          {user ? (
+            <Link href="/dashboard" className="bg-white text-indigo-600 hover:bg-gray-100 px-8 py-4 rounded-lg font-semibold inline-flex items-center space-x-2 transition">
+              <span>Go to Dashboard</span>
+              <ArrowRight className="h-5 w-5" />
+            </Link>
+          ) : (
+            <Link href="/sign-up" className="bg-white text-indigo-600 hover:bg-gray-100 px-8 py-4 rounded-lg font-semibold inline-flex items-center space-x-2 transition">
+              <span>Start Your Free Trial</span>
+              <ArrowRight className="h-5 w-5" />
+            </Link>
+          )}
         </div>
       </section>
 
