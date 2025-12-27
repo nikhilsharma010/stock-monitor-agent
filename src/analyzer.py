@@ -1,28 +1,28 @@
 """
-Analyzer module for deep stock financials and AI commentary.
+Analyzer module for deep stock financials and AI commentary using Groq.
 """
 import os
 import requests
 import time
-from datetime import datetime, timedelta
-import google.generativeai as genai
+from datetime import datetime
+from groq import Groq
 from utils import logger
 
 
 class StockAnalyzer:
     """Handles financial analysis and LLM commentary for stocks."""
     
-    def __init__(self, finnhub_api_key=None, gemini_api_key=None):
+    def __init__(self, finnhub_api_key=None, groq_api_key=None):
         self.finnhub_api_key = finnhub_api_key or os.getenv('FINNHUB_API_KEY')
-        self.gemini_api_key = gemini_api_key or os.getenv('GEMINI_API_KEY')
+        self.groq_api_key = groq_api_key or os.getenv('GROQ_API_KEY')
         self.finnhub_base_url = "https://finnhub.io/api/v1"
         
-        if self.gemini_api_key:
-            genai.configure(api_key=self.gemini_api_key)
-            self.model = genai.GenerativeModel('gemini-2.0-flash')
+        if self.groq_api_key:
+            self.client = Groq(api_key=self.groq_api_key)
+            self.model = "llama-3.1-70b-versatile" # High-quality available model
         else:
-            self.model = None
-            logger.warning("GEMINI_API_KEY not found. AI commentary will be disabled.")
+            self.client = None
+            logger.warning("GROQ_API_KEY not found. AI commentary will be disabled.")
 
     def get_basic_financials(self, ticker):
         """Fetch basic financial metrics (P/E, Market Cap, etc.)."""
@@ -82,9 +82,9 @@ class StockAnalyzer:
             return None
 
     def get_ai_commentary(self, ticker, metrics, quote, news=None, question=None):
-        """Generate AI commentary using Google Gemini."""
-        if not self.model:
-            return "AI commentary is currently disabled (missing API key)."
+        """Generate AI commentary using Groq."""
+        if not self.client:
+            return "AI commentary is currently disabled (missing GROQ_API_KEY)."
         
         try:
             # Prepare context for AI
@@ -112,26 +112,35 @@ class StockAnalyzer:
 
             # Prompt Construction
             if question:
-                prompt = (
-                    f"You are a seasoned financial analyst. Answer the following question about {ticker}.\n\n"
+                system_prompt = "You are a seasoned financial analyst. Provide precise, factual answers about stocks."
+                user_prompt = (
+                    f"Answer the following question about {ticker}.\n\n"
                     f"Context Data:\n{metrics_str}\n\nRecent Price Action:\n{price_context}\n{news_str}\n\n"
-                    f"Question: {question}\n\n"
-                    "Provide a precise, factual answer. Use your internal knowledge and the provided data."
+                    f"Question: {question}\n"
                 )
             else:
-                prompt = (
-                    f"You are a seasoned financial analyst. Provide a fundamental analysis for {ticker}.\n\n"
+                system_prompt = "You are a seasoned financial analyst. Be professional, concise, and focused on data."
+                user_prompt = (
+                    f"Provide a fundamental analysis for {ticker}.\n\n"
                     f"Financial Metrics:\n{metrics_str}\n\nRecent Price Action:\n{price_context}\n{news_str}\n"
                     "\nTask:\n"
                     "1. Summarize the company's current financial health.\n"
                     "2. Analyze recent price trends based on the day's movement and 52W range.\n"
-                    "3. Give a clear 'Buy/Hold/Sell' recommendation with a 1-sentence justification.\n\n"
-                    "Be professional, concise, and focused on data."
+                    "3. Give a clear 'Buy/Hold/Sell' recommendation with a 1-sentence justification.\n"
                 )
 
-            response = self.model.generate_content(prompt)
-            return response.text
+            chat_completion = self.client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                model=self.model,
+                temperature=0.2,
+                max_tokens=600
+            )
+            
+            return chat_completion.choices[0].message.content
             
         except Exception as e:
             logger.error(f"Error generating AI commentary for {ticker}: {str(e)}")
-            return f"⚠️ Failed to generate AI commentary: {str(e)}"
+            return f"⚠️ Failed to generate AI commentary with Groq: {str(e)}"
