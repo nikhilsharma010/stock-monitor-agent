@@ -30,7 +30,7 @@ class StockMonitorAgent:
         self.news_monitor = NewsMonitor()
         self.telegram = TelegramNotifier()
         self.cache = CacheDB()
-        self.bot_handler = TelegramBotHandler(config_path=config_path, cache=self.cache)
+        self.bot_handler = TelegramBotHandler(config_path=config_path, cache=self.cache, notifier=self.telegram)
         
         # Store config path for reloading
         self.config_path = config_path

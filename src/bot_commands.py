@@ -13,7 +13,7 @@ from analyzer import StockAnalyzer
 class TelegramBotHandler:
     """Handles incoming Telegram commands for managing stocks and settings."""
     
-    def __init__(self, bot_token=None, chat_id=None, config_path='config/stocks.json', cache=None):
+    def __init__(self, bot_token=None, chat_id=None, config_path='config/stocks.json', cache=None, notifier=None):
         self.bot_token = bot_token or os.getenv('TELEGRAM_BOT_TOKEN')
         self.chat_id = chat_id or os.getenv('TELEGRAM_CHAT_ID')
         self.config_path = config_path
@@ -23,12 +23,21 @@ class TelegramBotHandler:
         self.cache = cache or CacheDB()
         self.analyzer = StockAnalyzer()
         
-        # Clear any existing webhooks on startup to ensure getUpdates works
+        # Use existing notifier if provided, else create one
+        if notifier:
+            self.telegram_notifier = notifier
+        else:
+            from telegram_notifier import TelegramNotifier
+            self.telegram_notifier = TelegramNotifier(bot_token=self.bot_token, chat_id=self.chat_id)
+        
+        # Force clear webhook and set offset to ignore old messages
         try:
             requests.get(f"{self.api_url}/deleteWebhook", timeout=10)
-            logger.info("Bot command handler: Webhook cleared successfully.")
+            # Initial poll with offset -1 to acknowledge all old messages
+            requests.get(f"{self.api_url}/getUpdates", params={'offset': -1, 'limit': 1}, timeout=10)
+            logger.info("Bot command handler: Webhook cleared and old updates acknowledged.")
         except Exception as e:
-            logger.warning(f"Failed to clear webhook: {e}")
+            logger.debug(f"Non-critical failure clearing webhook: {e}")
         
     def load_config(self):
         """Load current configuration."""
@@ -73,19 +82,15 @@ class TelegramBotHandler:
             return []
     
     def send_message(self, message, chat_id=None):
-        """Send a message to the user."""
+        """Send a message using the shared notifier."""
+        if not message:
+            return False
+            
         try:
-            url = f"{self.api_url}/sendMessage"
-            payload = {
-                'chat_id': chat_id or self.chat_id,
-                'text': message,
-                'parse_mode': 'HTML'
-            }
-            response = requests.post(url, json=payload, timeout=10)
-            response.raise_for_status()
-            return True
+            # Use the more robust TelegramNotifier instance
+            return self.telegram_notifier.send_message(message, chat_id=chat_id)
         except Exception as e:
-            logger.error(f"Failed to send message: {e}")
+            logger.error(f"Failed to send message via notifier proxy: {e}")
             return False
     
     def handle_add_stock(self, ticker, user_id):
