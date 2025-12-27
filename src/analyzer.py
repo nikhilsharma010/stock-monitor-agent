@@ -8,6 +8,8 @@ import time
 from datetime import datetime, timedelta
 import io
 import pandas as pd
+import matplotlib
+matplotlib.use('Agg') # Headless support
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from groq import Groq
@@ -347,7 +349,8 @@ FORMAT:
             data = response.json()
             
             if data.get('s') != 'ok':
-                logger.error(f"Failed to fetch candles for {ticker}: {data.get('s')}")
+                reason = data.get('s', 'Unknown reason')
+                logger.error(f"Finnhub Candle Error for {ticker}: {reason}. Data: {data}")
                 return None
             
             # 2. Prepare Dataframe
