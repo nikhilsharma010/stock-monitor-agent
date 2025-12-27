@@ -41,14 +41,17 @@ class TelegramBotHandler:
             # Reset
             requests.get(f"{self.api_url}/deleteWebhook", timeout=10)
             
-            # Sync update_id to current state
+            # Sync update_id to current state - skip history
             resp = requests.get(f"{self.api_url}/getUpdates", params={'offset': -1, 'limit': 1}, timeout=10)
             if resp.ok:
                 data = resp.json()
                 result = data.get('result', [])
                 if result:
+                    # Set last_update_id to the most recent one to skip everything before now
                     self.last_update_id = result[0]['update_id']
-                    logger.info(f"Synchronized update_id: {self.last_update_id}")
+                    logger.info(f"Synchronized update_id: {self.last_update_id} (History Skipped)")
+                else:
+                    logger.info("No existing updates found in history.")
             
             logger.info("Bot command handler: Startup sync complete.")
         except Exception as e:
@@ -333,7 +336,9 @@ Use /list to see your personal stocks.
         """Process a command message."""
         try:
             parts = message_text.strip().split(maxsplit=1)
-            command = parts[0].lower()
+            raw_command = parts[0].lower()
+            # Handle commands with bot username (e.g., /help@MyBot)
+            command = raw_command.split('@')[0]
             args = parts[1] if len(parts) > 1 else ''
             
             if command == '/start':
