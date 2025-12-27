@@ -1,0 +1,349 @@
+"""
+# Stock Monitoring Agent - Deployment Trigger
+Main orchestrator for the stock monitoring agent.
+Coordinates stock monitoring, news fetching, and Telegram notifications.
+"""
+import os
+import json
+import time
+import schedule
+import threading
+from datetime import datetime
+from dotenv import load_dotenv
+
+from stock_monitor import StockMonitor
+from news_monitor import NewsMonitor
+from telegram_notifier import TelegramNotifier
+from bot_commands import TelegramBotHandler
+from utils import CacheDB, generate_content_hash, logger
+
+
+class StockMonitorAgent:
+    """Main agent that orchestrates stock monitoring and notifications."""
+    
+    def __init__(self, config_path='config/stocks.json'):
+        # Load environment variables
+        load_dotenv()
+        
+        # Initialize components
+        self.stock_monitor = StockMonitor()
+        self.news_monitor = NewsMonitor()
+        self.telegram = TelegramNotifier()
+        self.cache = CacheDB()
+        self.bot_handler = TelegramBotHandler(config_path=config_path, cache=self.cache, notifier=self.telegram)
+        
+        # Store config path for reloading
+        self.config_path = config_path
+        
+        # Load configuration
+        self.config = self._load_config(config_path)
+        self.stocks = self.config.get('stocks', [])
+        self.monitoring_config = self.config.get('monitoring', {})
+        
+        logger.info(f"Stock Monitor Agent initialized with {len(self.stocks)} stocks")
+    
+    def _load_config(self, config_path):
+        """Load stocks configuration from JSON file."""
+        try:
+            with open(config_path, 'r') as f:
+                config = json.load(f)
+                logger.info(f"Loaded configuration from {config_path}")
+                return config
+        except FileNotFoundError:
+            logger.error(f"Configuration file not found: {config_path}")
+            return {'stocks': [], 'monitoring': {}}
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON in configuration file: {e}")
+            return {'stocks': [], 'monitoring': {}}
+    
+    def check_stock_updates(self):
+        """Check for stock price updates and send notifications to all subscribers."""
+        logger.info("Checking stock updates for all monitored tickers...")
+        
+        tickers = self.cache.get_all_monitored_tickers()
+        if not tickers:
+            logger.info("No tickers currently on any user watchlists.")
+            return
+
+        for ticker in tickers:
+            # Fetch stock data
+            stock_data = self.stock_monitor.get_stock_data(ticker)
+            if not stock_data:
+                continue
+            
+            company_name = stock_data.get('name', ticker)
+            
+            # Check if we should notify based on price change
+            price_threshold = self.monitoring_config.get('price_change_threshold_percent', 5.0)
+            current_change = stock_data.get('change_percent')
+            change_percent = abs(current_change) if current_change is not None else 0
+            
+            if change_percent >= price_threshold:
+                # Generate hash for deduplication
+                content = f"{ticker}_price_{stock_data['current_price']:.2f}_{datetime.now().strftime('%Y-%m-%d')}"
+                content_hash = generate_content_hash(content)
+                
+                if not self.cache.is_duplicate(content_hash):
+                    # Get all subscribers for this ticker
+                    subscribers = self.cache.get_subscribers(ticker)
+                    for chat_id in subscribers:
+                        self.telegram.send_stock_alert(
+                            ticker=ticker,
+                            company_name=company_name,
+                            price=stock_data['current_price'],
+                            change_percent=stock_data['change_percent'],
+                            chat_id=chat_id
+                        )
+                    
+                    # Add to cache
+                    self.cache.add_notification(
+                        content_hash=content_hash,
+                        ticker=ticker,
+                        notification_type='price_alert',
+                        title=f"Price: ${stock_data['current_price']:.2f}"
+                    )
+    
+    def check_news_updates(self):
+        """Check for news updates and send notifications to all subscribers."""
+        logger.info("Checking news updates for all monitored tickers...")
+        
+        tickers = self.cache.get_all_monitored_tickers()
+        if not tickers:
+            return
+
+        notify_all = self.monitoring_config.get('notify_all_news', True)
+        
+        for ticker in tickers:
+            # Fetch news (last 24 hours)
+            articles = self.news_monitor.get_company_news(ticker, days_back=1)
+            if not articles:
+                continue
+            
+            # Filter to recent news (last check interval)
+            check_interval = self.monitoring_config.get('check_interval_minutes', 15)
+            recent_articles = self.news_monitor.filter_recent_news(
+                articles, 
+                hours=check_interval / 60 * 2
+            )
+            
+            if not recent_articles:
+                continue
+
+            # Need company name for the alert
+            stock_data = self.stock_monitor.get_stock_data(ticker)
+            company_name = stock_data.get('name', ticker) if stock_data else ticker
+            
+            # Send notifications for new articles
+            for article in recent_articles:
+                content_hash = generate_content_hash(f"{ticker}_{article['headline']}_{article['datetime']}")
+                
+                if not self.cache.is_duplicate(content_hash):
+                    if notify_all:
+                        # Get all subscribers for this ticker
+                        subscribers = self.cache.get_subscribers(ticker)
+                        for chat_id in subscribers:
+                            self.telegram.send_news_alert(
+                                ticker=ticker,
+                                company_name=company_name,
+                                headline=article['headline'],
+                                summary=article.get('summary', 'No summary available')[:300],
+                                url=article.get('url', ''),
+                                source=article.get('source', ''),
+                                chat_id=chat_id
+                            )
+                        
+                        # Add to cache
+                        self.cache.add_notification(
+                            content_hash=content_hash,
+                            ticker=ticker,
+                            notification_type='news',
+                            title=article['headline'][:100]
+                        )
+                        time.sleep(1)
+
+    def check_intelligence_alerts(self):
+        """Perform Pro Intelligence checks (Volume Anomalies, Earnings)."""
+        logger.info("Performing pro intelligence checks for all monitored tickers...")
+        
+        tickers = self.cache.get_all_monitored_tickers()
+        if not tickers:
+            return
+
+        for ticker in tickers:
+            try:
+                # 1. Fetch data
+                metrics = self.bot_handler.analyzer.get_basic_financials(ticker)
+                perf = self.bot_handler.analyzer.get_performance_metrics(ticker)
+                
+                if not metrics or not perf:
+                    continue
+
+                # 2. Volume Anomaly Check
+                anomaly_text = self.bot_handler.analyzer.check_volume_anomaly(metrics, perf)
+                if anomaly_text:
+                    content_hash = generate_content_hash(f"{ticker}_vol_anomaly_{datetime.now().strftime('%Y-%m-%d')}")
+                    if not self.cache.is_duplicate(content_hash):
+                        subscribers = self.cache.get_subscribers(ticker)
+                        for chat_id in subscribers:
+                            self.telegram.send_anomaly_alert(ticker, metrics.get('name', ticker), anomaly_text, chat_id=chat_id)
+                        self.cache.add_notification(content_hash, ticker, 'anomaly', 'Volume Spike')
+
+                # 3. Earnings Proximity Check
+                days_to = metrics.get('days_to_earnings', 999)
+                if 0 <= days_to <= 7:
+                    content_hash = generate_content_hash(f"{ticker}_earnings_near_{metrics.get('next_earnings')}")
+                    if not self.cache.is_duplicate(content_hash):
+                        subscribers = self.cache.get_subscribers(ticker)
+                        alert_text = f"📅 <b>EARNINGS PROXIMITY</b>: Next earnings on {metrics.get('next_earnings')} ({days_to} days away). Expect heightened volatility."
+                        for chat_id in subscribers:
+                            self.telegram.send_anomaly_alert(ticker, metrics.get('name', ticker), alert_text, chat_id=chat_id)
+                        self.cache.add_notification(content_hash, ticker, 'earnings', 'Earnings Proximity')
+
+            except Exception as e:
+                logger.error(f"Error checking intelligence for {ticker}: {e}")
+    
+    def run_monitoring_cycle(self):
+        """Run a complete monitoring cycle."""
+        logger.info("="*60)
+        logger.info(f"Starting monitoring cycle at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        logger.info("="*60)
+        
+        try:
+            # Reload config in case it was changed by commands
+            self.config = self._load_config(self.config_path)
+            self.stocks = self.config.get('stocks', [])
+            self.monitoring_config = self.config.get('monitoring', {})
+            
+            # Check stock updates
+            self.check_stock_updates()
+            
+            # Small delay between checks
+            time.sleep(2)
+            
+            # Check news updates
+            self.check_news_updates()
+
+            # Pro Intelligence Checks (New)
+            self.check_intelligence_alerts()
+            
+            # Cleanup old cache entries (weekly)
+            if datetime.now().hour == 0:  # Run at midnight
+                self.cache.cleanup_old_entries(days=7)
+            
+            logger.info("Monitoring cycle completed successfully")
+            
+        except Exception as e:
+            logger.error(f"Error during monitoring cycle: {e}", exc_info=True)
+    
+    def start_scheduled_monitoring(self):
+        """Start scheduled monitoring with configured interval."""
+        
+        logger.info("Starting scheduled monitoring")
+        logger.info(f"Monitoring stocks: {', '.join([s['ticker'] for s in self.stocks if s.get('enabled', True)])}")
+        
+        active_tickers = [s['ticker'] for s in self.stocks if s.get('enabled', True)]
+        if active_tickers and self.telegram.chat_id:
+            self.telegram.send_message(
+                "🚀 <b>Stock Monitor is LIVE!</b>\n\n"
+                f"Currently tracking: {', '.join(active_tickers)}\n"
+                "Use /help to see all commands."
+            )
+        else:
+            logger.info("Skipping startup message (no default chat_id set).")
+        
+        # Start bot command polling in a background thread for instant response
+        bot_thread = threading.Thread(target=self.bot_handler.start_polling, daemon=True)
+        bot_thread.start()
+        
+        # Run immediately on startup
+        self.run_monitoring_cycle()
+        
+        # Schedule periodic checks - will be updated dynamically
+        schedule.clear()
+        interval_minutes = self.monitoring_config.get('check_interval_minutes', 15)
+        schedule.every(interval_minutes).minutes.do(self.run_monitoring_cycle)
+        
+        logger.info(f"Scheduled checks every {interval_minutes} minutes")
+        
+        # Keep running
+        try:
+            last_interval = interval_minutes
+            while True:
+                schedule.run_pending()
+                
+                # Check if interval changed and reschedule if needed
+                current_interval = self.monitoring_config.get('check_interval_minutes', 15)
+                if current_interval != last_interval:
+                    logger.info(f"Interval changed from {last_interval} to {current_interval} minutes - rescheduling")
+                    schedule.clear()
+                    schedule.every(current_interval).minutes.do(self.run_monitoring_cycle)
+                    last_interval = current_interval
+                    self.telegram.send_message(
+                        f"⏱️ <b>Interval Updated</b>\n\n"
+                        f"Now checking every {current_interval} minutes"
+                    )
+                
+                time.sleep(1)  # Main loop sleep
+        except KeyboardInterrupt:
+            logger.info("Monitoring stopped by user")
+            self.telegram.send_message(
+                "🛑 <b>Stock Monitor Agent Stopped</b>\n\n"
+                "Monitoring has been paused."
+            )
+
+
+def main():
+    """Main entry point."""
+    print("="*60)
+    print("Stock Monitor Agent with Telegram Notifications")
+    print("="*60)
+    print()
+    
+    # Load .env if it exists (local dev), but don't fail if missing (cloud dev)
+    load_dotenv()
+    
+    # Diagnostic logging
+    for var in ['FINNHUB_API_KEY', 'TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID', 'GROQ_API_KEY']:
+        val = os.getenv(var)
+        status = "✅ FOUND" if val else "❌ MISSING"
+        masked = f"{val[:5]}...{val[-4:]}" if val and len(val) > 10 else "N/A"
+        logger.info(f"Startup Check: {var} is {status} ({masked if val else '---'})")
+    
+    # Required variables
+    required_vars = ['FINNHUB_API_KEY', 'TELEGRAM_BOT_TOKEN']
+    missing_vars = [var for var in required_vars if not os.getenv(var)]
+    
+    if missing_vars:
+        print(f"❌ Missing required environment variables: {', '.join(missing_vars)}")
+        if not os.path.exists('.env'):
+            print("No .env file found and system environment variables are not set.")
+        return
+    
+    try:
+        # Initialize and start agent
+        agent = StockMonitorAgent()
+        
+        # Test Telegram connection
+        if not agent.telegram.test_connection():
+            print("❌ Failed to connect to Telegram. Please check your credentials.")
+            return
+        
+        print("✅ All systems ready!")
+        print()
+        print("Starting monitoring...")
+        print("Press Ctrl+C to stop")
+        print()
+        
+        # Start scheduled monitoring
+        agent.start_scheduled_monitoring()
+        
+    except ValueError as e:
+        print(f"❌ Configuration error: {e}")
+        print("\nPlease check your .env file and ensure all required variables are set.")
+    except Exception as e:
+        logger.error(f"Fatal error: {e}", exc_info=True)
+        print(f"❌ Fatal error: {e}")
+
+
+if __name__ == "__main__":
+    main()
