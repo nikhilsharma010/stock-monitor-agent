@@ -356,8 +356,8 @@ This platform is free and open-source, but running the AI models and infrastruct
             if not chart_buf:
                 return f"❌ Failed to generate chart for {ticker}.\nReason: {error_reason or 'Internal Error'}"
             
-            # Use notifier.send_photo
-            success = self.notifier.send_photo(
+            # Use telegram_notifier.send_photo
+            success = self.telegram_notifier.send_photo(
                 chart_buf, 
                 caption=f"📈 <b>Technical Analysis: {ticker}</b>\n• SMAs: 20(Green), 50(Orange), 200(Red)\n• RSI(14) in purple",
                 chat_id=chat_id
