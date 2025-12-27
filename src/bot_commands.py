@@ -33,11 +33,16 @@ class TelegramBotHandler:
         # Force clear webhook and set offset to ignore old messages
         try:
             requests.get(f"{self.api_url}/deleteWebhook", timeout=10)
-            # Initial poll with offset -1 to acknowledge all old messages
-            requests.get(f"{self.api_url}/getUpdates", params={'offset': -1, 'limit': 1}, timeout=10)
-            logger.info("Bot command handler: Webhook cleared and old updates acknowledged.")
+            # Initial poll with offset -1 to acknowledge all old messages and get current state
+            resp = requests.get(f"{self.api_url}/getUpdates", params={'offset': -1, 'limit': 1}, timeout=10)
+            if resp.ok:
+                data = resp.json()
+                if data.get('result'):
+                    self.last_update_id = data['result'][0]['update_id']
+                    logger.info(f"Bot command handler: Backlog cleared. Starting from update {self.last_update_id}")
+            logger.info("Bot command handler: Ready for new messages.")
         except Exception as e:
-            logger.debug(f"Non-critical failure clearing webhook: {e}")
+            logger.debug(f"Non-critical failure clearing backlog: {e}")
         
     def load_config(self):
         """Load current configuration."""
@@ -160,6 +165,7 @@ class TelegramBotHandler:
 • /status - Show system status
 • /interval MIN - Set check interval
 • /debug - Check API key status
+• /ping - Quick connection test
 """
     
     def handle_status(self):
@@ -352,6 +358,8 @@ Use /list to see your personal stocks.
                 return self.handle_compare(args, chat_id)
             elif command == '/debug':
                 return self.handle_debug()
+            elif command == '/ping':
+                return "🏓 <b>Pong!</b> Bot is online and responsive."
             else:
                 return f"❌ Unknown command: {command}\n\nUse /help to see available commands"
         except Exception as e:

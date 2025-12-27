@@ -30,7 +30,7 @@ class CacheDB:
     
     def _init_db(self):
         """Initialize the database schema."""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=30)
         cursor = conn.cursor()
         
         cursor.execute('''
@@ -79,7 +79,7 @@ class CacheDB:
     
     def is_duplicate(self, content_hash):
         """Check if content has already been sent."""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=30)
         cursor = conn.cursor()
         
         cursor.execute(
@@ -95,7 +95,7 @@ class CacheDB:
     def add_notification(self, content_hash, ticker, notification_type, title=''):
         """Add a sent notification to the database."""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=30)
             cursor = conn.cursor()
             
             cursor.execute(
@@ -115,7 +115,7 @@ class CacheDB:
     
     def cleanup_old_entries(self, days=7):
         """Remove entries older than specified days."""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=30)
         cursor = conn.cursor()
         
         cursor.execute(
@@ -134,7 +134,7 @@ class CacheDB:
     def log_user_command(self, user_id, username, first_name, command, args=''):
         """Log a user's command and update their profile."""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=30)
             cursor = conn.cursor()
             
             # Upsert user
@@ -164,7 +164,7 @@ class CacheDB:
     def get_usage_metrics(self):
         """Fetch summary metrics for growth and usage."""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=30)
             cursor = conn.cursor()
             
             metrics = {}
@@ -192,7 +192,7 @@ class CacheDB:
     def add_to_watchlist(self, user_id, ticker):
         """Add a ticker to a user's personal watchlist."""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=30)
             cursor = conn.cursor()
             cursor.execute(
                 'INSERT OR IGNORE INTO user_watchlists (user_id, ticker) VALUES (?, ?)',
@@ -208,7 +208,7 @@ class CacheDB:
     def remove_from_watchlist(self, user_id, ticker):
         """Remove a ticker from a user's personal watchlist."""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=30)
             cursor = conn.cursor()
             cursor.execute(
                 'DELETE FROM user_watchlists WHERE user_id = ? AND ticker = ?',
@@ -224,7 +224,7 @@ class CacheDB:
     def get_user_watchlist(self, user_id):
         """Get all tickers watched by a specific user."""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=30)
             cursor = conn.cursor()
             cursor.execute('SELECT ticker FROM user_watchlists WHERE user_id = ?', (str(user_id),))
             tickers = [row[0] for row in cursor.fetchall()]
@@ -237,7 +237,7 @@ class CacheDB:
     def get_all_monitored_tickers(self):
         """Get a set of all unique tickers watched by any user."""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=30)
             cursor = conn.cursor()
             cursor.execute('SELECT DISTINCT ticker FROM user_watchlists')
             tickers = [row[0] for row in cursor.fetchall()]
@@ -250,7 +250,7 @@ class CacheDB:
     def get_subscribers(self, ticker):
         """Get all user_ids watching a specific ticker."""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=30)
             cursor = conn.cursor()
             cursor.execute('SELECT user_id FROM user_watchlists WHERE ticker = ?', (ticker.upper(),))
             user_ids = [row[0] for row in cursor.fetchall()]
