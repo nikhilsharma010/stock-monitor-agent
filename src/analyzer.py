@@ -346,15 +346,27 @@ FORMAT:
             }
             
             response = requests.get(url, params=params, timeout=10)
+            
+            # Diagnostic: Improved error handling
+            if response.status_code != 200:
+                error_body = response.text
+                logger.error(f"Finnhub HTTP {response.status_code} for {ticker}: {error_body}")
+                if response.status_code == 429:
+                    return None, "Finnhub API limit reached for charts. Please try again in 1 minute."
+                if response.status_code == 401:
+                    return None, "Finnhub API key is unauthorized for historical candle data."
+                return None, f"HTTP {response.status_code}: {error_body[:100]}"
+
             data = response.json()
             
             if data.get('s') != 'ok':
-                reason = data.get('s', 'Unknown reason')
-                error_msg = f"Finnhub API Error: {reason}"
+                reason = data.get('s') or data.get('error') or 'Unknown reason'
+                error_msg = f"Finnhub API: {reason}"
+                
                 if reason == 'no_data':
                     error_msg = "No historical data found for this symbol in the requested timeframe."
-                elif reason == 'error':
-                    error_msg = f"Finnhub API returned generic error. Check if symbol '{ticker}' is valid."
+                elif 'limit' in str(reason).lower():
+                    error_msg = "Finnhub API limit reached (Daily candle quota)."
                 
                 logger.error(f"Finnhub Candle Error for {ticker}: {reason}. Data: {data}")
                 return None, error_msg
