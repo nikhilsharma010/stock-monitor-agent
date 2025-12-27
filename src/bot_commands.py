@@ -179,6 +179,21 @@ class TelegramBotHandler:
 • /interval MIN - Set check interval
 • /debug - Check API key status
 • /ping - Quick connection test
+• /donate - Support the project ☕️
+"""
+    
+    def handle_donate(self):
+        """Show donation information."""
+        return """
+☕️ <b>Support Stock Monitor Agent</b>
+
+This platform is free and open-source, but running the AI models and infrastructure has costs. If you find this tool valuable, consider supporting its development!
+
+<b>Ways to Support:</b>
+• <a href="https://www.buymeacoffee.com/agenticai">Buy Me a Coffee</a>
+• <a href="https://github.com/sponsors/nikhilsharma010">GitHub Sponsors</a>
+
+<i>Your support helps keep the Deep Intelligence features fast and accessible for everyone!</i>
 """
     
     def handle_status(self):
@@ -208,6 +223,8 @@ class TelegramBotHandler:
 🔹 Active (24h): {metrics.get('active_users_24h', 0)}
 
 Use /list to see your personal stocks.
+
+☕️ <i>Support this project: /donate</i>
 """
 
     def handle_analyse(self, ticker, chat_id):
@@ -375,6 +392,8 @@ Use /list to see your personal stocks.
                 return self.handle_debug()
             elif command == '/ping':
                 return "🏓 <b>Pong!</b> Bot is online and responsive."
+            elif command == '/donate':
+                return self.handle_donate()
             else:
                 return f"❌ Unknown command: {command}\n\nUse /help to see available commands"
         except Exception as e:

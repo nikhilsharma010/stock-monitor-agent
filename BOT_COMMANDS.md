@@ -70,6 +70,22 @@ Example: `/interval 5` - Check price/news every 5 mins.
 ```
 Shows system-wide metrics: Total Users, Total Commands, and system health.
 
+---
+
+### ☕️ Support & Diagnostics
+
+**Support the project:**
+```
+/donate
+```
+*Show information on how to support the development of this platform.*
+
+**Check connectivity:**
+```
+/ping
+```
+*Quick test to verify the bot is online and responsive.*
+
 **Get help:**
 ```
 /help
