@@ -197,6 +197,7 @@ class StockMonitorAgent:
         logger.info("Starting scheduled monitoring")
         logger.info(f"Monitoring stocks: {', '.join([s['ticker'] for s in self.stocks if s.get('enabled', True)])}")
         
+        active_tickers = [s['ticker'] for s in self.stocks if s.get('enabled', True)]
         if active_tickers and self.telegram.chat_id:
             self.telegram.send_message(
                 "🚀 <b>Stock Monitor is LIVE!</b>\n\n"
