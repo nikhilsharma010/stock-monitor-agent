@@ -9,10 +9,18 @@ from datetime import datetime, timedelta
 import io
 import pandas as pd
 import yfinance as yf
-import matplotlib
-matplotlib.use('Agg') # Headless support
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
+
+# Optional matplotlib import for chart generation
+try:
+    import matplotlib
+    matplotlib.use('Agg')  # Headless support
+    import matplotlib.pyplot as plt
+    import matplotlib.dates as mdates
+    MATPLOTLIB_AVAILABLE = True
+except ImportError:
+    MATPLOTLIB_AVAILABLE = False
+    logger.warning("matplotlib not available - chart generation will be disabled")
+
 from groq import Groq
 from utils import logger
 
