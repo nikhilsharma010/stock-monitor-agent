@@ -455,7 +455,7 @@ Built with ❤️ for serious market participants.
         ticker = parts[0].upper().strip()
         question = parts[1]
         
-        self.send_message(f"🤔 <b>Consulting AI about {ticker}...</b>", chat_id=chat_id)
+        self.telegram_notifier.send_message(f"🤔 <b>Consulting AI about {ticker}...</b>", chat_id=chat_id)
         
         # We try to get news too if possible for better context
         # But we don't have direct access to NewsMonitor here easily without passing it
@@ -481,7 +481,7 @@ Built with ❤️ for serious market participants.
             return "❌ Usage: /chart TICKER\nExample: /chart NVDA"
         
         ticker = args.upper().strip()
-        self.send_message(f"📊 <b>Generating technical chart for {ticker}...</b>", chat_id=chat_id)
+        self.telegram_notifier.send_message(f"📊 <b>Generating technical chart for {ticker}...</b>", chat_id=chat_id)
         
         try:
             chart_buf, tech_context = self.analyzer.get_stock_chart(ticker)
@@ -522,7 +522,7 @@ Built with ❤️ for serious market participants.
             return "❌ Usage: /compare TICKER1 TICKER2\nExample: /compare AAPL MSFT"
         
         t1, t2 = tickers[0], tickers[1]
-        self.send_message(f"⚖️ <b>Comparing {t1} vs {t2}...</b>\nGathering data and AI comparison. This will take a moment.", chat_id=chat_id)
+        self.telegram_notifier.send_message(f"⚖️ <b>Comparing {t1} vs {t2}...</b>\nGathering data and AI comparison. This will take a moment.", chat_id=chat_id)
         
         try:
             # Gather data for both
@@ -726,7 +726,7 @@ Built with ❤️ for serious market participants.
         self.cache.set_user_interests(user_id, text)
         self.cache.set_user_step(user_id, 0)
         
-        self.send_message("🤵‍♂️ <b>Mapping your Financial DNA...</b>", chat_id=chat_id)
+        self.telegram_notifier.send_message("🤵‍♂️ <b>Mapping your Financial DNA...</b>", chat_id=chat_id)
         
         state = self.cache.get_user_state(user_id)
         summary = self.analyzer.get_persona_summary(state['risk'], state['interests'])
@@ -745,7 +745,7 @@ Built with ❤️ for serious market participants.
 
     def handle_undervalued(self, chat_id):
         """Find and display undervalued stock picks."""
-        self.send_message("🔍 <b>Searching Alpha List for undervalued gems...</b>\nAnalyzing growth vs valuation metrics. Please wait.", chat_id=chat_id)
+        self.telegram_notifier.send_message("🔍 <b>Searching Alpha List for undervalued gems...</b>\nAnalyzing growth vs valuation metrics. Please wait.", chat_id=chat_id)
         try:
             report = self.analyzer.get_undervalued_picks()
             return f"💎 <b>ALPHA DISCOVERY: Top Undervalued Picks</b>\n\n{report}{self.FINANCIAL_DISCLAIMER}"
@@ -774,7 +774,7 @@ Built with ❤️ for serious market participants.
         u_id = user_id or chat_id
         risk = self.cache.get_user_risk(u_id)
         wl = self.cache.get_user_watchlist(u_id)
-        self.send_message("☕️ <b>Brewing your Pre-Market Alpha Briefing...</b>\nAnalyzing global sector rotation and your watchlist. Please wait.", chat_id=chat_id)
+        self.telegram_notifier.send_message("☕️ <b>Brewing your Pre-Market Alpha Briefing...</b>\nAnalyzing global sector rotation and your watchlist. Please wait.", chat_id=chat_id)
         report = self.analyzer.get_pre_market_briefing(risk_profile=risk, watchlist=wl)
         return f"📍 <b>PRE-MARKET ALPHA: The Institutional Brief</b>\n\n{report}{self.FINANCIAL_DISCLAIMER}"
 
@@ -800,7 +800,7 @@ Built with ❤️ for serious market participants.
         if not voice: return
         
         file_id = voice['file_id']
-        self.send_message("🎙️ <b>Processing Voice Signal...</b>", chat_id=chat_id)
+        self.telegram_notifier.send_message("🎙️ <b>Processing Voice Signal...</b>", chat_id=chat_id)
         
         try:
             # 1. Get file path
@@ -829,7 +829,7 @@ Built with ❤️ for serious market participants.
             if os.path.exists(file_name): os.remove(file_name)
             
             trans_text = str(transcription).strip()
-            self.send_message(f"📝 <b>Transcribed:</b> \"{trans_text}\"", chat_id=chat_id)
+            self.telegram_notifier.send_message(f"📝 <b>Transcribed:</b> \"{trans_text}\"", chat_id=chat_id)
             
             # 4. Route to handle_ask if it looks like a ticker query
             # We assume any voice note for now is a question for the AI analyst
@@ -844,13 +844,13 @@ Built with ❤️ for serious market participants.
             
             if potential_ticker:
                 response = self.handle_ask(f"{potential_ticker} {trans_text}", chat_id)
-                self.send_message(response, chat_id=chat_id)
+                self.telegram_notifier.send_message(response, chat_id=chat_id)
             else:
-                self.send_message("🔬 <b>AI Insight:</b> I couldn't identify a specific ticker in your message. Try mentioning a symbol like 'AAPL' or 'NVDA'.", chat_id=chat_id)
+                self.telegram_notifier.send_message("🔬 <b>AI Insight:</b> I couldn't identify a specific ticker in your message. Try mentioning a symbol like 'AAPL' or 'NVDA'.", chat_id=chat_id)
                 
         except Exception as e:
             logger.error(f"Voice processing failed: {e}")
-            self.send_message(f"❌ Voice processing failed: {str(e)}", chat_id=chat_id)
+            self.telegram_notifier.send_message(f"❌ Voice processing failed: {str(e)}", chat_id=chat_id)
 
     def check_and_handle_commands(self):
         """Check for new commands and callback queries."""
@@ -906,9 +906,9 @@ Built with ❤️ for serious market participants.
                             break
                     if ticker:
                         resp = self.handle_ask(f"{ticker} {text}", chat_id)
-                        self.send_message(resp, chat_id=chat_id)
+                        self.telegram_notifier.send_message(resp, chat_id=chat_id)
                     else:
-                        self.send_message("🤖 I'm here! Tell me a ticker (e.g., AAPL) or ask a question.", chat_id=chat_id)
+                        self.telegram_notifier.send_message("🤖 I'm here! Tell me a ticker (e.g., AAPL) or ask a question.", chat_id=chat_id)
                 continue
             
             logger.info(f"📥 COMMAND RECEIVED: '{text}' from @{username} (Chat: {chat_id})")
@@ -927,7 +927,7 @@ Built with ❤️ for serious market participants.
                     logger.info(f"📤 REPLY SENT to @{username}")
             except Exception as e:
                 logger.error(f"Error processing command '{text}': {e}", exc_info=True)
-                self.send_message(f"❌ Sorry, an error occurred: {str(e)}", chat_id=chat_id)
+                self.telegram_notifier.send_message(f"❌ Sorry, an error occurred: {str(e)}", chat_id=chat_id)
 
     def start_polling(self):
         """Start a continuous loop to check for commands."""
