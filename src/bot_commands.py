@@ -13,6 +13,10 @@ from analyzer import StockAnalyzer
 class TelegramBotHandler:
     """Handles incoming Telegram commands for managing stocks and settings."""
     FINANCIAL_DISCLAIMER = "\n\n⚠️ <b>Disclaimer</b>: <i>This report is AI-generated for informational purposes only. Not financial advice. Always consult a certified professional before trading.</i>"
+    
+    # Version tracking
+    VERSION = "1.0.0"
+    VERSION_DATE = "2025-12-28"
 
     BOT_HEADER = """
 <b>ALPHA INTELLIGENCE v4.0</b>
@@ -274,6 +278,50 @@ Type <code>/help</code> to see all commands or <code>/start</code> to begin your
 Built with ❤️ for serious market participants.
 <i>Powered by Groq AI • yfinance • Reddit API</i>
 """
+    
+    def handle_version(self):
+        """Show current bot version and recent changes."""
+        changelog = f"""
+🤖 <b>ALPHA INTELLIGENCE BOT</b>
+
+<b>Version:</b> {self.VERSION}
+<b>Released:</b> {self.VERSION_DATE}
+<b>Status:</b> ✅ Live on Railway
+
+────────────────────────
+📝 <b>WHAT'S NEW IN v{self.VERSION}</b>
+
+<b>Features:</b>
+• Stock analysis with /snapshot
+• AI-powered Q&A with /ask
+• Stock comparison with /compare
+• Pre-market briefing with /premarket
+• Market selection for ambiguous tickers
+• Watchlist management (/add, /remove, /list)
+• Risk profile customization (/risk)
+• Sector rotation analysis (/sectors)
+• Alpha discovery (/undervalued)
+
+<b>Recent Fixes:</b>
+• ✅ Fixed market selection infinite loop
+• ✅ Fixed NoneType errors
+• ✅ Fixed command handler return values
+• ✅ Improved error handling
+• ✅ Optimized deployment speed
+
+<b>Known Issues:</b>
+• ⚠️ /chart disabled (matplotlib removed)
+
+────────────────────────
+💡 <b>QUICK TIPS</b>
+
+• Use /help to see all commands
+• Use /start for personalized onboarding
+• Report bugs or request features via /donate
+
+<i>Deployed on Railway • Auto-updates on push to main</i>
+"""
+        return changelog
     
     def handle_status(self):
         """Show current status with clean sections."""
@@ -668,6 +716,8 @@ Built with ❤️ for serious market participants.
                 return self.handle_sectors(), None
             elif command == '/donate':
                 return self.handle_donate(), None
+            elif command == '/version':
+                return self.handle_version(), None
             elif command == '/about' or command == '/info':
                 return self.handle_about(), None
             else:
