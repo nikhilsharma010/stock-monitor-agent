@@ -685,9 +685,8 @@ Built with ❤️ for serious market participants.
                     flag = "🇺🇸"
                 
                 # Execute the original command with resolved ticker
-                # Determine which command was originally called (stored in message text if needed)
-                # For now, default to snapshot
-                msg, kb = self.handle_analyse(resolved_ticker, chat_id, user_id)
+                # Skip market check since we just resolved it
+                msg, kb = self.handle_analyse(resolved_ticker, chat_id, user_id, skip_market_check=True)
                 self.telegram_notifier.send_message(msg, chat_id=chat_id, reply_markup=kb)
             return
         
