@@ -477,27 +477,27 @@ Built with ❤️ for serious market participants.
             
             # Check if we got valid data
             if not profile:
-                return f"❌ Could not fetch company profile for {ticker}. The ticker might be invalid."
+                return f"❌ Could not fetch company profile for {ticker}. The ticker might be invalid.", None
             if not metrics:
-                return f"❌ Could not fetch financial metrics for {ticker}."
+                return f"❌ Could not fetch financial metrics for {ticker}.", None
             if not quote:
-                return f"❌ Could not fetch stock quote for {ticker}."
+                return f"❌ Could not fetch stock quote for {ticker}.", None
             
             risk = self.cache.get_user_risk(u_id)
             alpha = self.analyzer.get_alpha_intelligence(ticker)
             
             answer = self.analyzer.get_ai_commentary(ticker, metrics, quote, question=question, profile=profile, alpha_intel=alpha, risk_profile=risk)
-            return f"🤖 <b>AI Answer for {ticker}:</b>\n\n{answer}{self.FINANCIAL_DISCLAIMER}"
+            return f"🤖 <b>AI Answer for {ticker}:</b>\n\n{answer}{self.FINANCIAL_DISCLAIMER}", None
         except Exception as e:
             logger.error(f"Error in handle_ask: {e}", exc_info=True)
-            return f"❌ Failed to get AI answer: {str(e)}"
+            return f"❌ Failed to get AI answer: {str(e)}", None
     
     
     def handle_chart(self, args, chat_id, user_id=None):
         """Generate and send technical chart."""
         u_id = user_id or chat_id
         if not args:
-            return "❌ Usage: /chart TICKER\nExample: /chart NVDA"
+            return "❌ Usage: /chart TICKER\nExample: /chart NVDA", None
         
         ticker = args.upper().strip()
         self.telegram_notifier.send_message(f"📊 <b>Generating technical chart for {ticker}...</b>", chat_id=chat_id)
@@ -505,7 +505,7 @@ Built with ❤️ for serious market participants.
         try:
             chart_buf, tech_context = self.analyzer.get_stock_chart(ticker)
             if not chart_buf:
-                return f"❌ Failed to generate chart for {ticker}.\nReason: {tech_context or 'Internal Error'}"
+                return f"❌ Failed to generate chart for {ticker}.\nReason: {tech_context or 'Internal Error'}", None
             
             # Fetch AI technical insights
             insights = self.analyzer.get_ai_technical_insights(ticker, tech_context)
@@ -525,20 +525,20 @@ Built with ❤️ for serious market participants.
             )
             
             if not success:
-                return "❌ Failed to send chart image. Please try again."
+                return "❌ Failed to send chart image. Please try again.", None
             
-            return None # Message sent via send_photo
+            return None, None # Message sent via send_photo
             
         except Exception as e:
             logger.error(f"Error in handle_chart for {ticker}: {e}", exc_info=True)
-            return f"❌ Error: {str(e)}"
+            return f"❌ Error: {str(e)}", None
 
     def handle_compare(self, args, chat_id, user_id=None):
         """Compare two stock tickers."""
         u_id = user_id or chat_id
         tickers = args.upper().strip().split()
         if len(tickers) < 2:
-            return "❌ Usage: /compare TICKER1 TICKER2\nExample: /compare AAPL MSFT"
+            return "❌ Usage: /compare TICKER1 TICKER2\nExample: /compare AAPL MSFT", None
         
         t1, t2 = tickers[0], tickers[1]
         self.telegram_notifier.send_message(f"⚖️ <b>Comparing {t1} vs {t2}...</b>\nGathering data and AI comparison. This will take a moment.", chat_id=chat_id)
@@ -546,7 +546,7 @@ Built with ❤️ for serious market participants.
         try:
             # Check if Groq client is available for AI comparison
             if not self.analyzer.groq_client:
-                return "❌ AI comparison is currently offline. Please ensure GROQ_API_KEY is configured."
+                return "❌ AI comparison is currently offline. Please ensure GROQ_API_KEY is configured.", None
             
             # Gather data for both
             m1 = self.analyzer.get_basic_financials(t1)
@@ -573,11 +573,11 @@ Built with ❤️ for serious market participants.
                 f"{commentary}\n"
                 f"────────────────────────"
             )
-            return report
+            return report, None
             
         except Exception as e:
             logger.error(f"Error in handle_compare: {e}")
-            return f"❌ Failed to compare stocks: {str(e)}"
+            return f"❌ Failed to compare stocks: {str(e)}", None
     
     def handle_debug(self):
         """Show diagnostic information."""
@@ -637,7 +637,7 @@ Built with ❤️ for serious market participants.
                 return self.handle_list_stocks(user_id)
             elif command == '/interval':
                 if not args:
-                    return "❌ Usage: /interval MINUTES\nExample: /interval 5"
+                    return "❌ Usage: /interval MINUTES\nExample: /interval 5", None
                 return self.handle_set_interval(args), None
             elif command == '/status':
                 return self.handle_status(), None
@@ -647,23 +647,23 @@ Built with ❤️ for serious market participants.
                     return f"❌ Usage: /{cmd_name} TICKER\nExample: /{cmd_name} AAPL", None
                 return self.handle_analyse(args, chat_id, user_id)
             elif command == '/chart':
-                return self.handle_chart(args, chat_id, user_id), None
+                return self.handle_chart(args, chat_id, user_id)
             elif command == '/ask':
                 if not args:
                     return "❌ Usage: /ask TICKER QUESTION\nExample: /ask CCCC What does this company do?", None
-                return self.handle_ask(args, chat_id, user_id), None
+                return self.handle_ask(args, chat_id, user_id)
             elif command == '/compare':
-                return self.handle_compare(args, chat_id, user_id), None
+                return self.handle_compare(args, chat_id, user_id)
             elif command == '/debug':
                 return self.handle_debug(), None
             elif command == '/ping':
                 return "🏓 <b>Pong!</b> Bot is online and responsive.", None
-            elif command == '/undervalued' or command == '/alpha' or command == '/discovery':
+            elif command == '/undervalued':
                 return self.handle_undervalued(chat_id), None
             elif command == '/risk':
                 return self.handle_risk(chat_id, user_id)
             elif command == '/premarket':
-                return self.handle_premarket(chat_id, user_id), None
+                return self.handle_premarket(chat_id, user_id)
             elif command == '/sectors':
                 return self.handle_sectors(), None
             elif command == '/donate':
@@ -674,7 +674,7 @@ Built with ❤️ for serious market participants.
                 return f"❌ Unknown command: {command}\n\nUse /help to see available commands", None
         except Exception as e:
             logger.error(f"Error processing command {message_text}: {e}", exc_info=True)
-            return f"❌ An internal error occurred while processing your command: {str(e)}"
+            return f"❌ An internal error occurred while processing your command: {str(e)}", None
     
     def handle_callback_query(self, callback_query):
         """Process inline button clicks."""
@@ -797,17 +797,17 @@ Built with ❤️ for serious market participants.
         
         # Check if Groq client is available
         if not self.analyzer.groq_client:
-            return "❌ AI pre-market briefing is currently offline. Please ensure GROQ_API_KEY is configured."
+            return "❌ AI pre-market briefing is currently offline. Please ensure GROQ_API_KEY is configured.", None
         
         try:
             risk = self.cache.get_user_risk(u_id)
             wl = self.cache.get_user_watchlist(u_id)
             self.telegram_notifier.send_message("☕️ <b>Brewing your Pre-Market Alpha Briefing...</b>\nAnalyzing global sector rotation and your watchlist. Please wait.", chat_id=chat_id)
             report = self.analyzer.get_pre_market_briefing(risk_profile=risk, watchlist=wl)
-            return f"📍 <b>PRE-MARKET ALPHA: The Institutional Brief</b>\n\n{report}{self.FINANCIAL_DISCLAIMER}"
+            return f"📍 <b>PRE-MARKET ALPHA: The Institutional Brief</b>\n\n{report}{self.FINANCIAL_DISCLAIMER}", None
         except Exception as e:
             logger.error(f"Error in handle_premarket: {e}", exc_info=True)
-            return f"❌ Failed to generate pre-market briefing: {str(e)}"
+            return f"❌ Failed to generate pre-market briefing: {str(e)}", None
 
     def handle_sectors(self):
         """Display sector rotation performance."""
