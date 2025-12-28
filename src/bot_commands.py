@@ -475,6 +475,14 @@ Built with ❤️ for serious market participants.
             quote = self.analyzer.get_stock_quote(ticker)
             profile = self.analyzer.get_company_profile(ticker)
             
+            # Check if we got valid data
+            if not profile:
+                return f"❌ Could not fetch company profile for {ticker}. The ticker might be invalid."
+            if not metrics:
+                return f"❌ Could not fetch financial metrics for {ticker}."
+            if not quote:
+                return f"❌ Could not fetch stock quote for {ticker}."
+            
             risk = self.cache.get_user_risk(u_id)
             alpha = self.analyzer.get_alpha_intelligence(ticker)
             
@@ -536,6 +544,10 @@ Built with ❤️ for serious market participants.
         self.telegram_notifier.send_message(f"⚖️ <b>Comparing {t1} vs {t2}...</b>\nGathering data and AI comparison. This will take a moment.", chat_id=chat_id)
         
         try:
+            # Check if Groq client is available for AI comparison
+            if not self.analyzer.groq_client:
+                return "❌ AI comparison is currently offline. Please ensure GROQ_API_KEY is configured."
+            
             # Gather data for both
             m1 = self.analyzer.get_basic_financials(t1)
             q1 = self.analyzer.get_stock_quote(t1)
@@ -782,11 +794,20 @@ Built with ❤️ for serious market participants.
     def handle_premarket(self, chat_id, user_id=None):
         """Generate pre-market briefing."""
         u_id = user_id or chat_id
-        risk = self.cache.get_user_risk(u_id)
-        wl = self.cache.get_user_watchlist(u_id)
-        self.telegram_notifier.send_message("☕️ <b>Brewing your Pre-Market Alpha Briefing...</b>\nAnalyzing global sector rotation and your watchlist. Please wait.", chat_id=chat_id)
-        report = self.analyzer.get_pre_market_briefing(risk_profile=risk, watchlist=wl)
-        return f"📍 <b>PRE-MARKET ALPHA: The Institutional Brief</b>\n\n{report}{self.FINANCIAL_DISCLAIMER}"
+        
+        # Check if Groq client is available
+        if not self.analyzer.groq_client:
+            return "❌ AI pre-market briefing is currently offline. Please ensure GROQ_API_KEY is configured."
+        
+        try:
+            risk = self.cache.get_user_risk(u_id)
+            wl = self.cache.get_user_watchlist(u_id)
+            self.telegram_notifier.send_message("☕️ <b>Brewing your Pre-Market Alpha Briefing...</b>\nAnalyzing global sector rotation and your watchlist. Please wait.", chat_id=chat_id)
+            report = self.analyzer.get_pre_market_briefing(risk_profile=risk, watchlist=wl)
+            return f"📍 <b>PRE-MARKET ALPHA: The Institutional Brief</b>\n\n{report}{self.FINANCIAL_DISCLAIMER}"
+        except Exception as e:
+            logger.error(f"Error in handle_premarket: {e}", exc_info=True)
+            return f"❌ Failed to generate pre-market briefing: {str(e)}"
 
     def handle_sectors(self):
         """Display sector rotation performance."""
