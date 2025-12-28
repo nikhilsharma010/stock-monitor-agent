@@ -1,4 +1,3 @@
-import { UserButton } from '@clerk/nextjs'
 import Link from 'next/link'
 import { BarChart3, Home, TrendingUp, Target, FileText, Bell, Settings } from 'lucide-react'
 
@@ -49,7 +48,7 @@ export default function DashboardLayout({
                             {/* Search will go here */}
                         </div>
                         <div className="flex items-center space-x-4">
-                            <UserButton afterSignOutUrl="/" />
+                            {/* User button removed temporarily */}
                         </div>
                     </div>
                 </header>
