@@ -361,6 +361,10 @@ FORMAT:
 
     def get_stock_chart(self, ticker, days=180):
         """Generate a technical chart with DMA and RSI overlays using yfinance."""
+        if not MATPLOTLIB_AVAILABLE:
+            logger.warning(f"Chart generation requested for {ticker} but matplotlib is not available")
+            return None, "Chart generation is not available - matplotlib not installed"
+        
         try:
             # 1. Fetch historical data via yfinance (Reliable Alternate)
             symbol = yf.Ticker(ticker)
