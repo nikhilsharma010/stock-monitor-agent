@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import os
 
 # Import from local directory (copied files)
 from analyzer import StockAnalyzer
@@ -14,11 +13,7 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",  # Next.js dev
-        "https://*.vercel.app",   # Vercel deployments
-        "https://alphaintelligence.vercel.app",  # Production
-    ],
+    allow_origins=["*"],  # Allow all origins for now
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -27,36 +22,18 @@ app.add_middleware(
 # Initialize services
 analyzer = StockAnalyzer()
 
-# Only initialize database if DATABASE_URL is set
-DATABASE_URL = os.getenv("DATABASE_URL")
-if DATABASE_URL and DATABASE_URL != "sqlite:///./alpha_intelligence.db":
-    try:
-        from app.routes import goals, theses, watchlist
-        from app.database import engine
-        from app import models
-        
-        # Create database tables
-        models.Base.metadata.create_all(bind=engine)
-        
-        # Include routers
-        app.include_router(goals.router, prefix="/api/goals", tags=["goals"])
-        app.include_router(theses.router, prefix="/api/theses", tags=["theses"])
-        app.include_router(watchlist.router, prefix="/api/watchlist", tags=["watchlist"])
-        
-        print("✅ Database connected and routes loaded")
-    except Exception as e:
-        print(f"⚠️ Database connection failed: {e}")
-        print("Running in stock-analysis-only mode")
-else:
-    print("⚠️ No DATABASE_URL set. Running in stock-analysis-only mode")
-
 @app.get("/")
 def root():
-    return {"message": "Alpha Intelligence API", "version": "2.0.0", "status": "running"}
+    return {
+        "message": "Alpha Intelligence API", 
+        "version": "2.0.0", 
+        "status": "running",
+        "endpoints": ["/health", "/api/stocks/{ticker}"]
+    }
 
 @app.get("/health")
 def health_check():
-    return {"status": "healthy"}
+    return {"status": "healthy", "service": "Alpha Intelligence API"}
 
 @app.get("/api/stocks/{ticker}")
 async def get_stock_analysis(ticker: str):
@@ -71,14 +48,6 @@ async def get_stock_analysis(ticker: str):
         }
     except Exception as e:
         return {"error": str(e), "ticker": ticker}
-
-@app.get("/api/stocks/{ticker}/chart")
-async def get_stock_chart(ticker: str):
-    """Get stock chart data"""
-    try:
-        return {"ticker": ticker, "chart": "chart_data"}
-    except Exception as e:
-        return {"error": str(e)}
 
 if __name__ == "__main__":
     import uvicorn
