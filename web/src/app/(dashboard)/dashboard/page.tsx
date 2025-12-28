@@ -1,8 +1,7 @@
-import { auth } from '@clerk/nextjs/server'
 import { TrendingUp, TrendingDown, DollarSign, Target } from 'lucide-react'
 
-export default async function DashboardPage() {
-    const { userId } = await auth()
+export default function DashboardPage() {
+    // Temporarily removed auth for deployment
 
     return (
         <div className="space-y-8">
