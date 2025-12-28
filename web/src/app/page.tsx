@@ -1,10 +1,8 @@
 import Link from 'next/link'
 import { ArrowRight, BarChart3, Target, Brain, TrendingUp } from 'lucide-react'
-import { currentUser } from '@clerk/nextjs/server'
-import { UserButton } from '@clerk/nextjs'
 
-export default async function Home() {
-  const user = await currentUser()
+export default function Home() {
+  const user = null // Temporarily removed auth
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
@@ -22,7 +20,6 @@ export default async function Home() {
                   <Link href="/dashboard" className="text-gray-300 hover:text-white transition">
                     Dashboard
                   </Link>
-                  <UserButton afterSignOutUrl="/" />
                 </>
               ) : (
                 <>
