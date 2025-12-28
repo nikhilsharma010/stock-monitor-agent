@@ -332,7 +332,7 @@ Built with ❤️ for serious market participants.
             ]}
             return msg, json.dumps(keyboard)
         
-        self.send_message(f"🔍 <b>Generating Deep Intelligence Report for {ticker}...</b>\nFetching 60 days of context and sector trends. Please wait.", chat_id=chat_id)
+        self.telegram_notifier.send_message(f"🔍 <b>Generating Deep Intelligence Report for {ticker}...</b>\nFetching 60 days of context and sector trends. Please wait.", chat_id=chat_id)
         
         try:
             # 1. Fetch Metrics
