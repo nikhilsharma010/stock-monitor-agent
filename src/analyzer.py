@@ -9,6 +9,8 @@ from datetime import datetime, timedelta
 import io
 import pandas as pd
 import yfinance as yf
+from groq import Groq
+from utils import logger
 
 # Optional matplotlib import for chart generation
 try:
@@ -21,8 +23,6 @@ except ImportError:
     MATPLOTLIB_AVAILABLE = False
     logger.warning("matplotlib not available - chart generation will be disabled")
 
-from groq import Groq
-from utils import logger
 
 
 class StockAnalyzer:
