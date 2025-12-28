@@ -440,10 +440,21 @@ Built with ❤️ for serious market participants.
                 ]
             ]}
 
-            return report, json.dumps(keyboard)
+            # If called from callback (skip_market_check=True), send the message directly
+            if skip_market_check:
+                self.telegram_notifier.send_message(report, chat_id=chat_id, reply_markup=json.dumps(keyboard))
+                return None, None  # Indicate message was sent
+            else:
+                # If called from command, return the message for the command handler to send
+                return report, json.dumps(keyboard)
         except Exception as e:
             logger.error(f"Error in handle_analyse: {e}", exc_info=True)
-            return f"❌ Failed to generate report: {str(e)}", None
+            error_msg = f"❌ Failed to generate report: {str(e)}"
+            if skip_market_check:
+                self.telegram_notifier.send_message(error_msg, chat_id=chat_id)
+                return None, None
+            else:
+                return error_msg, None
 
     def handle_ask(self, parts_text, chat_id, user_id=None):
         """Handle user questions about a stock."""
@@ -686,8 +697,8 @@ Built with ❤️ for serious market participants.
                 
                 # Execute the original command with resolved ticker
                 # Skip market check since we just resolved it
-                msg, kb = self.handle_analyse(resolved_ticker, chat_id, user_id, skip_market_check=True)
-                self.telegram_notifier.send_message(msg, chat_id=chat_id, reply_markup=kb)
+                # handle_analyse will send the analysis message directly, so we don't need to send it again
+                self.handle_analyse(resolved_ticker, chat_id, user_id, skip_market_check=True)
             return
         
         if action == 'chart':
