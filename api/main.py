@@ -1,11 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import sys
-import os
 
-# Add shared directory to path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'shared'))
-
+# Import from local directory (copied files)
 from analyzer import StockAnalyzer
 from app.routes import goals, theses, watchlist
 from app.database import engine
