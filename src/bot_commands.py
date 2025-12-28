@@ -314,14 +314,14 @@ Built with ❤️ for serious market participants.
         _, kb = self.handle_risk(chat_id)
         return msg, kb
 
-    def handle_analyse(self, ticker, chat_id, user_id=None):
+    def handle_analyse(self, ticker, chat_id, user_id=None, skip_market_check=False):
         """Perform 60-day 'Deep Intelligence' analysis on a stock."""
         # Use chat_id as fallback for user_id
         u_id = user_id or chat_id
         ticker = ticker.upper().strip()
         
-        # Check if ticker already has market suffix
-        if not (ticker.endswith('.NS') or ticker.endswith('.BO')):
+        # Check if ticker already has market suffix (skip if called from market selection callback)
+        if not skip_market_check and not (ticker.endswith('.NS') or ticker.endswith('.BO')):
             # Show market selection buttons for ambiguous tickers
             msg = f"🌍 <b>Select Market for {ticker}</b>\n\nIs this an Indian or US stock?"
             keyboard = {"inline_keyboard": [
