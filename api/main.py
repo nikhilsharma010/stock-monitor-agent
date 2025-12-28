@@ -1,14 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import os
 
 # Import from local directory (copied files)
 from analyzer import StockAnalyzer
-from app.routes import goals, theses, watchlist
-from app.database import engine
-from app import models
-
-# Create database tables
-models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Alpha Intelligence API",
@@ -32,14 +27,32 @@ app.add_middleware(
 # Initialize services
 analyzer = StockAnalyzer()
 
-# Include routers
-app.include_router(goals.router, prefix="/api/goals", tags=["goals"])
-app.include_router(theses.router, prefix="/api/theses", tags=["theses"])
-app.include_router(watchlist.router, prefix="/api/watchlist", tags=["watchlist"])
+# Only initialize database if DATABASE_URL is set
+DATABASE_URL = os.getenv("DATABASE_URL")
+if DATABASE_URL and DATABASE_URL != "sqlite:///./alpha_intelligence.db":
+    try:
+        from app.routes import goals, theses, watchlist
+        from app.database import engine
+        from app import models
+        
+        # Create database tables
+        models.Base.metadata.create_all(bind=engine)
+        
+        # Include routers
+        app.include_router(goals.router, prefix="/api/goals", tags=["goals"])
+        app.include_router(theses.router, prefix="/api/theses", tags=["theses"])
+        app.include_router(watchlist.router, prefix="/api/watchlist", tags=["watchlist"])
+        
+        print("✅ Database connected and routes loaded")
+    except Exception as e:
+        print(f"⚠️ Database connection failed: {e}")
+        print("Running in stock-analysis-only mode")
+else:
+    print("⚠️ No DATABASE_URL set. Running in stock-analysis-only mode")
 
 @app.get("/")
 def root():
-    return {"message": "Alpha Intelligence API", "version": "2.0.0"}
+    return {"message": "Alpha Intelligence API", "version": "2.0.0", "status": "running"}
 
 @app.get("/health")
 def health_check():
